@@ -6,8 +6,8 @@ class ServerConfig {
 
   // Production defaults — point to Cloudflare tunnel domains.
   // User can override in Settings screen for local dev.
-  static const defaultUrl = 'https://api.YOUR_DOMAIN';
-  static const defaultPbUrl = 'https://pb.YOUR_DOMAIN';
+  static const defaultUrl = 'https://api.shadomfacepro.duckdns.org';
+  static const defaultPbUrl = 'https://pb.shadomfacepro.duckdns.org';
 
   static String _current = defaultUrl;
   static String _pbCurrent = defaultPbUrl;

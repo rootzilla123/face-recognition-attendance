@@ -8,7 +8,7 @@ metadata:
 spec:
   acme:
     server: https://acme-v02.api.letsencrypt.org/directory
-    email: admin@YOUR_DOMAIN        # replace with real email for expiry alerts
+    email: admin@shadomfacepro.duckdns.org        # replace with real email for expiry alerts
     privateKeySecretRef:
       name: letsencrypt-prod-key
     solvers:

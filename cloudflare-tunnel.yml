@@ -8,7 +8,7 @@
 # If you prefer config-file mode instead of the token method, use this file:
 #   cloudflared tunnel --config cloudflare-tunnel.yml run
 #
-# Replace YOUR_DOMAIN with your actual domain (e.g. attendanceai.com)
+# Replace shadomfacepro.duckdns.org with your actual domain (e.g. attendanceai.com)
 # ─────────────────────────────────────────────────────────────────────────────
 
 tunnel: <YOUR_TUNNEL_ID>
@@ -16,22 +16,22 @@ credentials-file: /etc/cloudflared/credentials.json
 
 ingress:
   # Next.js dashboard — main app
-  - hostname: YOUR_DOMAIN
+  - hostname: shadomfacepro.duckdns.org
     service: http://dashboard:3000
 
   # FastAPI backend — mobile app + dashboard API calls
-  - hostname: api.YOUR_DOMAIN
+  - hostname: api.shadomfacepro.duckdns.org
     service: http://backend:8001
     originRequest:
       # Allow WebSocket connections (used for live attendance alerts)
       noTLSVerify: false
 
   # PocketBase — Flutter mobile app real-time sync
-  - hostname: pb.YOUR_DOMAIN
+  - hostname: pb.shadomfacepro.duckdns.org
     service: http://pocketbase:8090
 
   # GlitchTip error monitoring (internal — restrict access via Cloudflare Access if needed)
-  - hostname: errors.YOUR_DOMAIN
+  - hostname: errors.shadomfacepro.duckdns.org
     service: http://glitchtip:8000
 
   # Catch-all — required by cloudflared

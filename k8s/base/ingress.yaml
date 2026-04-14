@@ -1,6 +1,6 @@
 # Traefik is k3s's built-in ingress — no extra install needed.
 # cert-manager handles Let's Encrypt TLS automatically.
-# Replace YOUR_DOMAIN once you have a domain.
+# Replace shadomfacepro.duckdns.org once you have a domain.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -12,12 +12,12 @@ metadata:
 spec:
   tls:
     - hosts:
-        - YOUR_DOMAIN
-        - api.YOUR_DOMAIN
-        - pb.YOUR_DOMAIN
+        - shadomfacepro.duckdns.org
+        - api.shadomfacepro.duckdns.org
+        - pb.shadomfacepro.duckdns.org
       secretName: main-tls
   rules:
-    - host: YOUR_DOMAIN
+    - host: shadomfacepro.duckdns.org
       http:
         paths:
           - path: /
@@ -27,7 +27,7 @@ spec:
                 name: dashboard
                 port:
                   number: 3000
-    - host: api.YOUR_DOMAIN
+    - host: api.shadomfacepro.duckdns.org
       http:
         paths:
           - path: /
@@ -37,7 +37,7 @@ spec:
                 name: backend
                 port:
                   number: 8001
-    - host: pb.YOUR_DOMAIN
+    - host: pb.shadomfacepro.duckdns.org
       http:
         paths:
           - path: /
