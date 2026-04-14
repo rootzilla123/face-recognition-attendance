@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "223148362760",
+    "project_id": "face-recogniton-attendance",
+    "storage_bucket": "face-recogniton-attendance.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:223148362760:android:14dd151fea1794117115bd",
+        "android_client_info": {
+          "package_name": "com.skulicheck.facerecognition"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC5RhSxE_nWUjyVn1ghmMMQOEcFE8Zzydo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

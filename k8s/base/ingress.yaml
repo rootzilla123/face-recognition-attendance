@@ -1,0 +1,49 @@
+# Traefik is k3s's built-in ingress — no extra install needed.
+# cert-manager handles Let's Encrypt TLS automatically.
+# Replace YOUR_DOMAIN once you have a domain.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: main-ingress
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+spec:
+  tls:
+    - hosts:
+        - YOUR_DOMAIN
+        - api.YOUR_DOMAIN
+        - pb.YOUR_DOMAIN
+      secretName: main-tls
+  rules:
+    - host: YOUR_DOMAIN
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: dashboard
+                port:
+                  number: 3000
+    - host: api.YOUR_DOMAIN
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: backend
+                port:
+                  number: 8001
+    - host: pb.YOUR_DOMAIN
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: pocketbase
+                port:
+                  number: 8090

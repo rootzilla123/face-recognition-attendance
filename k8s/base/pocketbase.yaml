@@ -1,0 +1,68 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pocketbase
+spec:
+  replicas: 1          # PocketBase is single-node by design
+  selector:
+    matchLabels:
+      app: pocketbase
+  strategy:
+    type: Recreate     # PocketBase uses a file-based SQLite — no concurrent writes
+  template:
+    metadata:
+      labels:
+        app: pocketbase
+    spec:
+      containers:
+        - name: pocketbase
+          image: ghcr.io/muchobien/pocketbase:latest
+          ports:
+            - containerPort: 8090
+          volumeMounts:
+            - name: pb-data
+              mountPath: /pb/pb_data
+            - name: pb-migrations
+              mountPath: /pb/pb_migrations
+              readOnly: true
+          livenessProbe:
+            httpGet:
+              path: /api/health
+              port: 8090
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+      volumes:
+        - name: pb-data
+          persistentVolumeClaim:
+            claimName: pocketbase-pvc
+        - name: pb-migrations
+          configMap:
+            name: pb-migrations
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pocketbase
+spec:
+  selector:
+    app: pocketbase
+  ports:
+    - port: 8090
+      targetPort: 8090
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pocketbase-pvc
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 5Gi

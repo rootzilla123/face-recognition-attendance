@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: attendance_db
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "8025:8025"   # Web UI
+      - "1025:1025"   # SMTP
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "true"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "true"
+    restart: unless-stopped
+
+  compreface-postgres-db:
+    image: exadel/compreface-postgres-db:1.2.0
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=frs
+    volumes:
+      - comprefore_data:/var/lib/postgresql/data
+
+  compreface-admin:
+    image: exadel/compreface-admin:1.2.0
+    ports:
+      - "8091:8080"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_URL=jdbc:postgresql://compreface-postgres-db:5432/frs
+      - SPRING_PROFILES_ACTIVE=dev
+      - ENABLE_EMAIL_SERVER=false
+      - EMAIL_HOST=smtp.gmail.com
+      - EMAIL_USERNAME=
+      - EMAIL_FROM=
+      - EMAIL_PASSWORD=
+      - ADMIN_JAVA_OPTS=-Xmx4g
+    depends_on:
+      - compreface-postgres-db
+
+  compreface-api:
+    image: exadel/compreface-api:1.2.0
+    ports:
+      - "8000:8080"
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_URL=jdbc:postgresql://compreface-postgres-db:5432/frs
+      - SPRING_PROFILES_ACTIVE=dev
+      - API_JAVA_OPTS=-Xmx4g
+    depends_on:
+      - compreface-postgres-db
+      - compreface-admin
+
+  compreface-fe:
+    image: exadel/compreface-fe:1.2.0
+    ports:
+      - "8080:80"
+    environment:
+      - CLIENT_MAX_BODY_SIZE=10M
+      - PROXY_READ_TIMEOUT=300s
+      - PROXY_CONNECT_TIMEOUT=10s
+    depends_on:
+      - compreface-api
+      - compreface-admin
+
+  compreface-core:
+    image: exadel/compreface-core:1.2.0
+    environment:
+      - ML_PORT=3000
+    depends_on:
+      - compreface-postgres-db
+
+volumes:
+  postgres_data:
+  comprefore_data:

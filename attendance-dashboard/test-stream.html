@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>MJPEG Stream Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+        }
+        .stream-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        img {
+            width: 100%;
+            max-width: 800px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+        }
+        .status {
+            margin-top: 10px;
+            padding: 10px;
+            background: #e8f5e9;
+            border-radius: 4px;
+            color: #2e7d32;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎥 MJPEG Stream Test</h1>
+    
+    <div class="stream-container">
+        <h2>Camera 3 - Live Stream</h2>
+        <img 
+            src="http://localhost:8001/api/v1/cameras/3/stream" 
+            alt="Camera 3 Stream"
+            onload="document.getElementById('status').textContent = '✅ Stream is working!'"
+            onerror="document.getElementById('status').textContent = '❌ Stream failed to load'"
+        />
+        <div class="status" id="status">⏳ Loading stream...</div>
+    </div>
+    
+    <div style="margin-top: 20px; padding: 15px; background: white; border-radius: 8px;">
+        <h3>Instructions:</h3>
+        <p>If you see the live video above, then MJPEG streaming is working perfectly!</p>
+        <p>The issue with the main app is just the WebSocket connection for status updates.</p>
+        <p><strong>Stream URL:</strong> <code>http://localhost:8001/api/v1/cameras/3/stream</code></p>
+    </div>
+</body>
+</html>

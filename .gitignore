@@ -1,0 +1,45 @@
+# ── Secrets — NEVER commit these ─────────────────────────────────────────────
+.env
+.env.local
+.env.production
+.env.staging
+secrets/
+
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+.venv/
+*.egg-info/
+dist/
+.pytest_cache/
+
+# ── Node ──────────────────────────────────────────────────────────────────────
+node_modules/
+.next/
+attendance-dashboard/.next/
+
+# ── Flutter / Dart ────────────────────────────────────────────────────────────
+mobile_app/.dart_tool/
+mobile_app/build/
+mobile_app/.flutter-plugins
+mobile_app/.flutter-plugins-dependencies
+*.apk
+*.aab
+*.ipa
+
+# ── PocketBase data ───────────────────────────────────────────────────────────
+pb_data/
+
+# ── Misc ──────────────────────────────────────────────────────────────────────
+*.log
+.DS_Store
+.vscode/
+__pycache__/
+*.zip
+mailpit
+pocketbase
+pocketbase_*.zip

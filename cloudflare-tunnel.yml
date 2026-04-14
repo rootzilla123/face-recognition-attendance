@@ -1,0 +1,38 @@
+# cloudflare-tunnel.yml
+#
+# ── How to use this file ──────────────────────────────────────────────────────
+# This is the tunnel ingress config. You configure it in the Cloudflare dashboard
+# (Zero Trust → Networks → Tunnels → your tunnel → Public Hostname tab).
+# You do NOT need to manage this file manually if you use the dashboard.
+#
+# If you prefer config-file mode instead of the token method, use this file:
+#   cloudflared tunnel --config cloudflare-tunnel.yml run
+#
+# Replace YOUR_DOMAIN with your actual domain (e.g. attendanceai.com)
+# ─────────────────────────────────────────────────────────────────────────────
+
+tunnel: <YOUR_TUNNEL_ID>
+credentials-file: /etc/cloudflared/credentials.json
+
+ingress:
+  # Next.js dashboard — main app
+  - hostname: YOUR_DOMAIN
+    service: http://dashboard:3000
+
+  # FastAPI backend — mobile app + dashboard API calls
+  - hostname: api.YOUR_DOMAIN
+    service: http://backend:8001
+    originRequest:
+      # Allow WebSocket connections (used for live attendance alerts)
+      noTLSVerify: false
+
+  # PocketBase — Flutter mobile app real-time sync
+  - hostname: pb.YOUR_DOMAIN
+    service: http://pocketbase:8090
+
+  # GlitchTip error monitoring (internal — restrict access via Cloudflare Access if needed)
+  - hostname: errors.YOUR_DOMAIN
+    service: http://glitchtip:8000
+
+  # Catch-all — required by cloudflared
+  - service: http_status:404
