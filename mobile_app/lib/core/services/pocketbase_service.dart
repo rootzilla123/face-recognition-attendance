@@ -5,7 +5,6 @@ import 'package:google_sign_in/google_sign_in.dart';
 import '../utils/server_config.dart';
 
 /// Handles all PocketBase auth operations
-/// PocketBase runs at port 8090 alongside FastAPI at 8001
 class PocketBaseService {
   static String get _pbUrl => ServerConfig.pbUrl;
 

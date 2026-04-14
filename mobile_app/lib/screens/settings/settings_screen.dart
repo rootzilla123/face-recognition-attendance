@@ -177,13 +177,13 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     const Text('Server Configuration', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                     const SizedBox(height: 4),
-                    const Text('Set the IP address of your FastAPI backend', style: TextStyle(color: AppColors.gray500, fontSize: 12)),
+                    const Text('Override the default server URL (advanced)', style: TextStyle(color: AppColors.gray500, fontSize: 12)),
                     const SizedBox(height: 14),
                     TextField(
                       controller: _serverUrlCtrl,
                       decoration: const InputDecoration(
-                        labelText: 'Server Base URL',
-                        hintText: 'http://192.168.x.x:8001',
+                        labelText: 'API Server URL',
+                        hintText: 'https://api.shadomfacepro.duckdns.org',
                         prefixIcon: Icon(Icons.dns_outlined),
                         border: OutlineInputBorder(),
                       ),
@@ -210,7 +210,7 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                       controller: _pbUrlCtrl,
                       decoration: const InputDecoration(
                         labelText: 'PocketBase URL',
-                        hintText: 'http://192.168.x.x:8090',
+                        hintText: 'https://pb.shadomfacepro.duckdns.org',
                         prefixIcon: Icon(Icons.lock_outline),
                         border: OutlineInputBorder(),
                       ),

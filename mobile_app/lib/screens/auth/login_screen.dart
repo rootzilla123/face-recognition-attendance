@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/websocket_provider.dart';
 import '../../core/utils/app_theme.dart';
-import '../../core/utils/server_config.dart';
 import '../shell.dart';
 import 'register_screen.dart';
 import 'forgot_password_screen.dart';
@@ -27,46 +26,6 @@ class _LoginScreenState extends State<LoginScreen> {
       context.read<WebSocketProvider>().connect();
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AppShell()));
     }
-  }
-
-  Future<void> _showServerConfig() async {
-    final ctrl = TextEditingController(text: ServerConfig.baseUrl);
-    await showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF0F172A),
-        title: const Text('Server URL', style: TextStyle(color: Colors.white)),
-        content: TextField(
-          controller: ctrl,
-          style: const TextStyle(color: Colors.white),
-          decoration: InputDecoration(
-            hintText: 'http://192.168.x.x:8090',
-            hintStyle: const TextStyle(color: Colors.white38),
-            filled: true,
-            fillColor: Colors.white10,
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () async {
-              final url = ctrl.text.trim();
-              if (url.isNotEmpty) {
-                // Save both FastAPI (8001) and PocketBase (8090) URLs derived from input
-                final apiUrl = url.replaceAll(':8090', ':8001').replaceAll(':8000', ':8001');
-                final pbUrl = url.replaceAll(':8001', ':8090').replaceAll(':8000', ':8090');
-                await ServerConfig.save(apiUrl);
-                await ServerConfig.savePbUrl(pbUrl);
-              }
-              if (ctx.mounted) Navigator.pop(ctx);
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-    ctrl.dispose();
   }
 
   Future<void> _googleSignIn() async {
@@ -109,24 +68,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 6),
                 const Text('Welcome back', style: TextStyle(color: Colors.white70, fontSize: 14)),
                 const SizedBox(height: 8),
-                GestureDetector(
-                  onTap: _showServerConfig,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.07),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
-                    ),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      const Icon(Icons.dns_outlined, color: Colors.white38, size: 13),
-                      const SizedBox(width: 5),
-                      Text(ServerConfig.pbUrl, style: const TextStyle(color: Colors.white38, fontSize: 11)),
-                      const SizedBox(width: 5),
-                      const Icon(Icons.edit_outlined, color: Colors.white38, size: 11),
-                    ]),
-                  ),
-                ),
                 const SizedBox(height: 40),
                 Container(
                   padding: const EdgeInsets.all(24),
@@ -137,28 +78,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   child: Column(children: [
                     if (auth.error != null)
-                      GestureDetector(
-                        onTap: auth.error!.toLowerCase().contains('socket') ||
-                               auth.error!.toLowerCase().contains('connection') ||
-                               auth.error!.toLowerCase().contains('network') ||
-                               auth.error!.toLowerCase().contains('refused')
-                            ? _showServerConfig : null,
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 16),
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(color: AppColors.error500.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10), border: Border.all(color: AppColors.error500.withValues(alpha: 0.3))),
-                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                            Text(auth.error!, style: const TextStyle(color: AppColors.error500, fontSize: 13)),
-                            if (auth.error!.toLowerCase().contains('socket') ||
-                                auth.error!.toLowerCase().contains('connection') ||
-                                auth.error!.toLowerCase().contains('network') ||
-                                auth.error!.toLowerCase().contains('refused'))
-                              const Padding(
-                                padding: EdgeInsets.only(top: 6),
-                                child: Text('Tap here to update the server URL', style: TextStyle(color: Color(0xFF60A5FA), fontSize: 12)),
-                              ),
-                          ]),
-                        ),
+                      Container(
+                        margin: const EdgeInsets.only(bottom: 16),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(color: AppColors.error500.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(10), border: Border.all(color: AppColors.error500.withValues(alpha: 0.3))),
+                        child: Text(auth.error!, style: const TextStyle(color: AppColors.error500, fontSize: 13)),
                       ),
                     if (auth.isLoggedIn && !auth.isVerified)
                       Container(

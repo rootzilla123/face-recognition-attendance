@@ -1,8 +1,6 @@
 import PocketBase from 'pocketbase';
 
-const PB_URL = typeof window !== 'undefined'
-  ? `${window.location.protocol}//${window.location.hostname}:8090`
-  : 'http://localhost:8090';
+const PB_URL = process.env.NEXT_PUBLIC_PB_URL ?? 'http://localhost:8090';
 
 export const pb = new PocketBase(PB_URL);
 
