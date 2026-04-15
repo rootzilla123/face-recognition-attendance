@@ -196,17 +196,21 @@ jobs:
           # Wait a moment for cleanup
           sleep 2
           
-          # Use main tag as fallback if specific tag doesn't exist
-          IMAGE_TAG="${{ steps.tag.outputs.tag }}"
-          IMAGE="${{ env.REGISTRY }}/${{ env.REPO }}/backend:${IMAGE_TAG}"
-          
-          # Run migration with image pull secret
+          # Run migration with all env vars from secret
           kubectl -n ${{ steps.env.outputs.name }} run $POD_NAME \
-            --image=${IMAGE} \
+            --image=${{ env.REGISTRY }}/${{ env.REPO }}/backend:${{ steps.tag.outputs.tag }} \
             --restart=Never \
-            --env="DATABASE_URL=${{ secrets.DATABASE_URL }}" \
-            --overrides='{"spec":{"imagePullSecrets":[{"name":"ghcr-secret"}]}}' \
-            --command -- alembic upgrade head
+            --overrides='{
+              "spec": {
+                "imagePullSecrets": [{"name": "ghcr-secret"}],
+                "containers": [{
+                  "name": "'"$POD_NAME"'",
+                  "image": "'"${{ env.REGISTRY }}/${{ env.REPO }}/backend:${{ steps.tag.outputs.tag }}"'",
+                  "command": ["alembic", "upgrade", "head"],
+                  "envFrom": [{"secretRef": {"name": "app-secrets"}}]
+                }]
+              }
+            }'
           
           # Wait for completion
           kubectl -n ${{ steps.env.outputs.name }} wait pod/$POD_NAME \
