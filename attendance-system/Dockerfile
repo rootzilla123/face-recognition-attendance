@@ -24,6 +24,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && addgroup --system app && adduser --system --ingroup app app
 
 COPY --from=builder /install /usr/local
+COPY alembic.ini ./
+COPY alembic/ ./alembic/
 COPY app/ ./app/
 
 # Drop root
