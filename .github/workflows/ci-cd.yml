@@ -179,15 +179,17 @@ jobs:
 
       - name: Run DB migrations
         run: |
+          kubectl -n ${{ steps.env.outputs.name }} delete pod alembic-migrate-${{ steps.tag.outputs.tag }} --ignore-not-found
           kubectl -n ${{ steps.env.outputs.name }} run alembic-migrate-${{ steps.tag.outputs.tag }} \
             --image=${{ env.REGISTRY }}/${{ env.REPO }}/backend:${{ steps.tag.outputs.tag }} \
             --restart=Never \
             --env="DATABASE_URL=${{ secrets.DATABASE_URL }}" \
             --command -- alembic upgrade head
-          kubectl -n ${{ steps.env.outputs.name }} wait --for=condition=complete \
-            job/alembic-migrate-${{ steps.tag.outputs.tag }} --timeout=120s || \
-          kubectl -n ${{ steps.env.outputs.name }} logs \
-            alembic-migrate-${{ steps.tag.outputs.tag }}
+          kubectl -n ${{ steps.env.outputs.name }} wait pod/alembic-migrate-${{ steps.tag.outputs.tag }} \
+            --for=condition=Ready --timeout=60s || true
+          kubectl -n ${{ steps.env.outputs.name }} wait pod/alembic-migrate-${{ steps.tag.outputs.tag }} \
+            --for=jsonpath='{.status.phase}'=Succeeded --timeout=120s || \
+          kubectl -n ${{ steps.env.outputs.name }} logs alembic-migrate-${{ steps.tag.outputs.tag }}
 
       - name: Deploy backend
         run: |
