@@ -51,6 +51,16 @@ jobs:
       - name: Run Alembic migrations against test DB
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/attendance_test
+          REDIS_URL: redis://localhost:6379
+          SECRET_KEY: ci-test-secret-not-used-in-prod
+          COMPREFORE_URL: http://localhost:8000
+          COMPREFORE_API_KEY: test
+          COMPREFORE_DETECTION_API_KEY: test
+          TWILIO_ACCOUNT_SID: test
+          TWILIO_AUTH_TOKEN: test
+          TWILIO_PHONE_NUMBER: "+10000000000"
+          SENDGRID_API_KEY: test
+          SENDGRID_FROM_EMAIL: test@test.com
         run: alembic upgrade head
 
       - name: Run tests
