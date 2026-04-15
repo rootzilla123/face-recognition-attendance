@@ -19,6 +19,8 @@ spec:
       labels:
         app: dashboard
     spec:
+      imagePullSecrets:
+        - name: ghcr-secret
       terminationGracePeriodSeconds: 30
       containers:
         - name: dashboard
