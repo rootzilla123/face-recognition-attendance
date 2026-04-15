@@ -179,32 +179,76 @@ jobs:
 
       - name: Run DB migrations
         run: |
-          kubectl -n ${{ steps.env.outputs.name }} delete pod alembic-migrate-${{ steps.tag.outputs.tag }} --ignore-not-found
-          kubectl -n ${{ steps.env.outputs.name }} run alembic-migrate-${{ steps.tag.outputs.tag }} \
+          POD_NAME="alembic-migrate-${{ steps.tag.outputs.tag }}"
+          
+          # Clean up any existing pod
+          kubectl -n ${{ steps.env.outputs.name }} delete pod $POD_NAME --ignore-not-found --wait=true
+          
+          # Wait a moment for cleanup
+          sleep 2
+          
+          # Run migration
+          kubectl -n ${{ steps.env.outputs.name }} run $POD_NAME \
             --image=${{ env.REGISTRY }}/${{ env.REPO }}/backend:${{ steps.tag.outputs.tag }} \
             --restart=Never \
             --env="DATABASE_URL=${{ secrets.DATABASE_URL }}" \
             --command -- alembic upgrade head
-          kubectl -n ${{ steps.env.outputs.name }} wait pod/alembic-migrate-${{ steps.tag.outputs.tag }} \
-            --for=condition=Ready --timeout=60s || true
-          kubectl -n ${{ steps.env.outputs.name }} wait pod/alembic-migrate-${{ steps.tag.outputs.tag }} \
-            --for=jsonpath='{.status.phase}'=Succeeded --timeout=120s || \
-          kubectl -n ${{ steps.env.outputs.name }} logs alembic-migrate-${{ steps.tag.outputs.tag }}
+          
+          # Wait for completion
+          kubectl -n ${{ steps.env.outputs.name }} wait pod/$POD_NAME \
+            --for=jsonpath='{.status.phase}'=Succeeded --timeout=180s || {
+            echo "Migration failed. Logs:"
+            kubectl -n ${{ steps.env.outputs.name }} logs $POD_NAME
+            exit 1
+          }
+          
+          echo "Migration completed successfully"
 
       - name: Deploy backend
         run: |
+          # Record current revision before deploying
+          kubectl -n ${{ steps.env.outputs.name }} rollout history deployment/backend || echo "No previous history"
+          
+          # Update image
           kubectl -n ${{ steps.env.outputs.name }} set image deployment/backend \
-            backend=${{ env.REGISTRY }}/${{ env.REPO }}/backend:${{ steps.tag.outputs.tag }}
-          kubectl -n ${{ steps.env.outputs.name }} rollout status deployment/backend --timeout=120s
+            backend=${{ env.REGISTRY }}/${{ env.REPO }}/backend:${{ steps.tag.outputs.tag }} \
+            --record=true
+          
+          # Wait for rollout
+          kubectl -n ${{ steps.env.outputs.name }} rollout status deployment/backend --timeout=180s
 
       - name: Deploy dashboard
         run: |
+          # Record current revision before deploying
+          kubectl -n ${{ steps.env.outputs.name }} rollout history deployment/dashboard || echo "No previous history"
+          
+          # Update image
           kubectl -n ${{ steps.env.outputs.name }} set image deployment/dashboard \
-            dashboard=${{ env.REGISTRY }}/${{ env.REPO }}/dashboard:${{ steps.tag.outputs.tag }}
-          kubectl -n ${{ steps.env.outputs.name }} rollout status deployment/dashboard --timeout=120s
+            dashboard=${{ env.REGISTRY }}/${{ env.REPO }}/dashboard:${{ steps.tag.outputs.tag }} \
+            --record=true
+          
+          # Wait for rollout
+          kubectl -n ${{ steps.env.outputs.name }} rollout status deployment/dashboard --timeout=180s
 
       - name: Rollback on failure
         if: failure()
         run: |
-          kubectl -n ${{ steps.env.outputs.name }} rollout undo deployment/backend
-          kubectl -n ${{ steps.env.outputs.name }} rollout undo deployment/dashboard
+          echo "Deployment failed, attempting rollback..."
+          
+          # Rollback backend if it has history
+          if kubectl -n ${{ steps.env.outputs.name }} rollout history deployment/backend 2>/dev/null | grep -q "REVISION"; then
+            echo "Rolling back backend..."
+            kubectl -n ${{ steps.env.outputs.name }} rollout undo deployment/backend
+            kubectl -n ${{ steps.env.outputs.name }} rollout status deployment/backend --timeout=120s
+          else
+            echo "No backend rollout history available"
+          fi
+          
+          # Rollback dashboard if it has history
+          if kubectl -n ${{ steps.env.outputs.name }} rollout history deployment/dashboard 2>/dev/null | grep -q "REVISION"; then
+            echo "Rolling back dashboard..."
+            kubectl -n ${{ steps.env.outputs.name }} rollout undo deployment/dashboard
+            kubectl -n ${{ steps.env.outputs.name }} rollout status deployment/dashboard --timeout=120s
+          else
+            echo "No dashboard rollout history available"
+          fi
