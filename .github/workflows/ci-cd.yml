@@ -196,9 +196,13 @@ jobs:
           # Wait a moment for cleanup
           sleep 2
           
+          # Use main tag as fallback if specific tag doesn't exist
+          IMAGE_TAG="${{ steps.tag.outputs.tag }}"
+          IMAGE="${{ env.REGISTRY }}/${{ env.REPO }}/backend:${IMAGE_TAG}"
+          
           # Run migration with image pull secret
           kubectl -n ${{ steps.env.outputs.name }} run $POD_NAME \
-            --image=${{ env.REGISTRY }}/${{ env.REPO }}/backend:${{ steps.tag.outputs.tag }} \
+            --image=${IMAGE} \
             --restart=Never \
             --env="DATABASE_URL=${{ secrets.DATABASE_URL }}" \
             --overrides='{"spec":{"imagePullSecrets":[{"name":"ghcr-secret"}]}}' \
@@ -207,8 +211,10 @@ jobs:
           # Wait for completion
           kubectl -n ${{ steps.env.outputs.name }} wait pod/$POD_NAME \
             --for=jsonpath='{.status.phase}'=Succeeded --timeout=180s || {
-            echo "Migration failed. Logs:"
-            kubectl -n ${{ steps.env.outputs.name }} logs $POD_NAME
+            echo "Migration failed. Checking pod status..."
+            kubectl -n ${{ steps.env.outputs.name }} describe pod $POD_NAME
+            echo "Pod logs:"
+            kubectl -n ${{ steps.env.outputs.name }} logs $POD_NAME || true
             exit 1
           }
           
