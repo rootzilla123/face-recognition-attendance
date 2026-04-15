@@ -9,6 +9,7 @@ on:
 env:
   REGISTRY: ghcr.io
   REPO: calvinceoyugah2-del/face-recognition-attendance
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   # ── 1. Lint & test backend ──────────────────────────────────────────────────
@@ -154,6 +155,11 @@ jobs:
           else
             echo "name=staging" >> $GITHUB_OUTPUT
           fi
+
+      - name: Connect to Twingate
+        uses: twingate/github-action@v1
+        with:
+          service-key: ${{ secrets.TWINGATE_SERVICE_KEY }}
 
       - name: Write kubeconfig
         run: |
