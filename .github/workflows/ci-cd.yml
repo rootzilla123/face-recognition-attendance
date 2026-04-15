@@ -196,11 +196,12 @@ jobs:
           # Wait a moment for cleanup
           sleep 2
           
-          # Run migration
+          # Run migration with image pull secret
           kubectl -n ${{ steps.env.outputs.name }} run $POD_NAME \
             --image=${{ env.REGISTRY }}/${{ env.REPO }}/backend:${{ steps.tag.outputs.tag }} \
             --restart=Never \
             --env="DATABASE_URL=${{ secrets.DATABASE_URL }}" \
+            --overrides='{"spec":{"imagePullSecrets":[{"name":"ghcr-secret"}]}}' \
             --command -- alembic upgrade head
           
           # Wait for completion
