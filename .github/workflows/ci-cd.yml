@@ -179,12 +179,11 @@ jobs:
 
       - name: Setup image pull secret
         run: |
-          # Create or update GHCR pull secret
           kubectl -n ${{ steps.env.outputs.name }} create secret docker-registry ghcr-secret \
             --docker-server=ghcr.io \
             --docker-username=${{ github.actor }} \
             --docker-password=${{ secrets.GITHUB_TOKEN }} \
-            --dry-run=client -o yaml | kubectl apply -f -
+            --dry-run=client -o yaml | kubectl apply --validate=false -f -
 
       - name: Run DB migrations
         run: |
