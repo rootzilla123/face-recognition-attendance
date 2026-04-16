@@ -211,16 +211,28 @@ jobs:
               }
             }'
           
-          # Wait for image pull + completion
+          # Wait until pod is no longer Pending/ContainerCreating (no timeout on pull)
+          echo "Waiting for image pull..."
+          while true; do
+            PHASE=$(kubectl -n ${{ steps.env.outputs.name }} get pod $POD_NAME -o jsonpath='{.status.phase}' 2>/dev/null)
+            REASON=$(kubectl -n ${{ steps.env.outputs.name }} get pod $POD_NAME -o jsonpath='{.status.containerStatuses[0].state.waiting.reason}' 2>/dev/null)
+            if [ "$PHASE" = "Succeeded" ] || [ "$PHASE" = "Failed" ] || ([ "$PHASE" = "Running" ]); then
+              break
+            fi
+            echo "  status: $PHASE / $REASON - still waiting..."
+            sleep 10
+          done
+
+          # Now wait for completion
           kubectl -n ${{ steps.env.outputs.name }} wait pod/$POD_NAME \
-            --for=jsonpath='{.status.phase}'=Succeeded --timeout=600s || {
+            --for=jsonpath='{.status.phase}'=Succeeded --timeout=300s || {
             echo "Migration failed. Checking pod status..."
             kubectl -n ${{ steps.env.outputs.name }} describe pod $POD_NAME
             echo "Pod logs:"
             kubectl -n ${{ steps.env.outputs.name }} logs $POD_NAME || true
             exit 1
           }
-          
+
           echo "Migration completed successfully"
 
       - name: Deploy backend
