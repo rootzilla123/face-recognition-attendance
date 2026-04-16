@@ -239,13 +239,13 @@ jobs:
         run: |
           kubectl -n ${{ steps.env.outputs.name }} set image deployment/backend \
             backend=${{ env.REGISTRY }}/${{ env.REPO }}/backend:${{ steps.tag.outputs.tag }}
-          kubectl -n ${{ steps.env.outputs.name }} rollout status deployment/backend --timeout=180s
+          kubectl -n ${{ steps.env.outputs.name }} rollout status deployment/backend --timeout=600s
 
       - name: Deploy dashboard
         run: |
           kubectl -n ${{ steps.env.outputs.name }} set image deployment/dashboard \
             dashboard=${{ env.REGISTRY }}/${{ env.REPO }}/dashboard:${{ steps.tag.outputs.tag }}
-          kubectl -n ${{ steps.env.outputs.name }} rollout status deployment/dashboard --timeout=180s
+          kubectl -n ${{ steps.env.outputs.name }} rollout status deployment/dashboard --timeout=600s
 
       - name: Rollback on failure
         if: failure()
