@@ -211,9 +211,9 @@ jobs:
               }
             }'
           
-          # Wait for completion
+          # Wait for image pull + completion
           kubectl -n ${{ steps.env.outputs.name }} wait pod/$POD_NAME \
-            --for=jsonpath='{.status.phase}'=Succeeded --timeout=180s || {
+            --for=jsonpath='{.status.phase}'=Succeeded --timeout=600s || {
             echo "Migration failed. Checking pod status..."
             kubectl -n ${{ steps.env.outputs.name }} describe pod $POD_NAME
             echo "Pod logs:"
