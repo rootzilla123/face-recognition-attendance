@@ -1,11 +1,12 @@
 from twilio.rest import Client
-from sendgrid import SendGridAPIClient
-from sendgrid.helpers.mail import Mail
+import resend
 from sqlalchemy.orm import Session
 from app.config import settings
 import logging
 
 logger = logging.getLogger(__name__)
+
+resend.api_key = settings.resend_api_key
 
 
 class NotificationService:
@@ -14,7 +15,6 @@ class NotificationService:
             settings.twilio_account_sid,
             settings.twilio_auth_token
         )
-        self.sendgrid = SendGridAPIClient(settings.sendgrid_api_key)
 
     def send_sms(self, phone: str, message: str) -> dict:
         try:
@@ -30,13 +30,12 @@ class NotificationService:
 
     def send_email(self, email: str, subject: str, message: str) -> dict:
         try:
-            mail = Mail(
-                from_email=settings.sendgrid_from_email,
-                to_emails=email,
-                subject=subject,
-                plain_text_content=message
-            )
-            self.sendgrid.send(mail)
+            resend.Emails.send({
+                "from": settings.resend_from_email,
+                "to": email,
+                "subject": subject,
+                "text": message,
+            })
             return {"status": "sent"}
         except Exception as e:
             logger.error(f"Email failed to {email}: {e}")
@@ -49,18 +48,11 @@ def notify_parents_of_attendance(
     attendance_record,
     notification_svc: NotificationService = None
 ):
-    """
-    Called after attendance is marked.
-    Finds linked parents and sends SMS, email, and in-app notifications
-    based on their preferences.
-    """
     from app.models import Parent, ParentStudent, User, Notification, UserRole
-    from datetime import datetime
 
     if notification_svc is None:
         notification_svc = NotificationService()
 
-    # Find parents linked to this student
     links = db.query(ParentStudent).filter(
         ParentStudent.student_id == student.id
     ).all()
@@ -83,7 +75,6 @@ def notify_parents_of_attendance(
             User.role == UserRole.parent
         ).first()
 
-        # SMS
         if prefs.get("sms", True) and parent.phone:
             result = notification_svc.send_sms(parent.phone, message)
             _save_notification(db, "sms", parent.phone, subject, message,
@@ -91,7 +82,6 @@ def notify_parents_of_attendance(
                                parent_user.id if parent_user else None,
                                result.get("status", "failed"))
 
-        # Email
         if prefs.get("email", True) and parent.email:
             result = notification_svc.send_email(parent.email, subject, message)
             _save_notification(db, "email", parent.email, subject, message,
@@ -99,7 +89,6 @@ def notify_parents_of_attendance(
                                parent_user.id if parent_user else None,
                                result.get("status", "failed"))
 
-        # In-app
         if prefs.get("in_app", True) and parent_user:
             _save_notification(db, "in_app", parent.email, subject, message,
                                attendance_record.id, student.id,
@@ -109,13 +98,7 @@ def notify_parents_of_attendance(
 
 
 def notify_users_of_announcement(db: Session, announcement, notification_svc: NotificationService = None):
-    """
-    Called after an announcement is published.
-    Sends in-app notifications to all users in target_roles.
-    Also sends email to parents if they have email notifications enabled.
-    """
     from app.models import User, Parent, Notification, UserRole
-    from datetime import datetime
 
     if notification_svc is None:
         notification_svc = NotificationService()
@@ -127,7 +110,6 @@ def notify_users_of_announcement(db: Session, announcement, notification_svc: No
     ).all()
 
     for user in users:
-        # Always create in-app notification
         _save_notification(
             db, "in_app", user.email,
             announcement.title, announcement.content,
@@ -135,7 +117,6 @@ def notify_users_of_announcement(db: Session, announcement, notification_svc: No
             announcement_id=announcement.id
         )
 
-        # Email parents if they opted in
         if user.role == UserRole.parent and user.profile_id:
             parent = db.query(Parent).filter(Parent.id == user.profile_id).first()
             if parent and (parent.notification_preferences or {}).get("email", True):

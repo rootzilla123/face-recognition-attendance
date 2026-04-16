@@ -226,49 +226,27 @@ jobs:
 
       - name: Deploy backend
         run: |
-          # Record current revision before deploying
-          kubectl -n ${{ steps.env.outputs.name }} rollout history deployment/backend || echo "No previous history"
-          
-          # Update image
           kubectl -n ${{ steps.env.outputs.name }} set image deployment/backend \
-            backend=${{ env.REGISTRY }}/${{ env.REPO }}/backend:${{ steps.tag.outputs.tag }} \
-            --record=true
-          
-          # Wait for rollout
+            backend=${{ env.REGISTRY }}/${{ env.REPO }}/backend:${{ steps.tag.outputs.tag }}
           kubectl -n ${{ steps.env.outputs.name }} rollout status deployment/backend --timeout=180s
 
       - name: Deploy dashboard
         run: |
-          # Record current revision before deploying
-          kubectl -n ${{ steps.env.outputs.name }} rollout history deployment/dashboard || echo "No previous history"
-          
-          # Update image
           kubectl -n ${{ steps.env.outputs.name }} set image deployment/dashboard \
-            dashboard=${{ env.REGISTRY }}/${{ env.REPO }}/dashboard:${{ steps.tag.outputs.tag }} \
-            --record=true
-          
-          # Wait for rollout
+            dashboard=${{ env.REGISTRY }}/${{ env.REPO }}/dashboard:${{ steps.tag.outputs.tag }}
           kubectl -n ${{ steps.env.outputs.name }} rollout status deployment/dashboard --timeout=180s
 
       - name: Rollback on failure
         if: failure()
         run: |
           echo "Deployment failed, attempting rollback..."
-          
-          # Rollback backend if it has history
-          if kubectl -n ${{ steps.env.outputs.name }} rollout history deployment/backend 2>/dev/null | grep -q "REVISION"; then
-            echo "Rolling back backend..."
-            kubectl -n ${{ steps.env.outputs.name }} rollout undo deployment/backend
-            kubectl -n ${{ steps.env.outputs.name }} rollout status deployment/backend --timeout=120s
-          else
-            echo "No backend rollout history available"
-          fi
-          
-          # Rollback dashboard if it has history
-          if kubectl -n ${{ steps.env.outputs.name }} rollout history deployment/dashboard 2>/dev/null | grep -q "REVISION"; then
-            echo "Rolling back dashboard..."
-            kubectl -n ${{ steps.env.outputs.name }} rollout undo deployment/dashboard
-            kubectl -n ${{ steps.env.outputs.name }} rollout status deployment/dashboard --timeout=120s
-          else
-            echo "No dashboard rollout history available"
-          fi
+          for deploy in backend dashboard; do
+            REVISIONS=$(kubectl -n ${{ steps.env.outputs.name }} rollout history deployment/$deploy 2>/dev/null | grep -c "^[0-9]" || echo 0)
+            if [ "$REVISIONS" -gt 1 ]; then
+              echo "Rolling back $deploy..."
+              kubectl -n ${{ steps.env.outputs.name }} rollout undo deployment/$deploy
+              kubectl -n ${{ steps.env.outputs.name }} rollout status deployment/$deploy --timeout=120s
+            else
+              echo "No rollback history for $deploy, skipping"
+            fi
+          done

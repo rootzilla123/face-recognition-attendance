@@ -18,9 +18,9 @@ class Settings(BaseSettings):
     twilio_auth_token: str
     twilio_phone_number: str
 
-    # SendGrid
-    sendgrid_api_key: str
-    sendgrid_from_email: str
+    # Resend (email)
+    resend_api_key: str
+    resend_from_email: str
 
     # JWT
     secret_key: str
