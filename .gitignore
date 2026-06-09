@@ -44,3 +44,4 @@ mailpit
 pocketbase
 pocketbase_*.zip
 firebase-service-account.json
+*firebase*adminsdk*.json
