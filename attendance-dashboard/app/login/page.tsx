@@ -122,6 +122,29 @@ function LoginForm() {
             )}
             Sign in with Google
           </button>
+
+          {/* Development Bypass Buttons */}
+          <div className="mt-8 pt-6 border-t border-white/10">
+            <p className="text-xs text-gray-500 mb-3 text-center font-semibold uppercase">Quick Access (Dev)</p>
+            <div className="grid grid-cols-2 gap-2">
+              <button onClick={() => { setEmail('admin@school.com'); setPassword('admin123'); setTimeout(() => handleSubmit(new Event('submit') as any), 100); }}
+                className="py-2 px-3 rounded-xl bg-blue-600/20 hover:bg-blue-600/30 border border-blue-500/30 text-xs font-bold text-blue-300 transition-all">
+                → Admin
+              </button>
+              <button onClick={() => { setEmail('teacher@school.com'); setPassword('teacher123'); setTimeout(() => handleSubmit(new Event('submit') as any), 100); }}
+                className="py-2 px-3 rounded-xl bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-xs font-bold text-purple-300 transition-all">
+                → Teacher
+              </button>
+              <button onClick={() => { setEmail('student@school.com'); setPassword('student123'); setTimeout(() => handleSubmit(new Event('submit') as any), 100); }}
+                className="py-2 px-3 rounded-xl bg-green-600/20 hover:bg-green-600/30 border border-green-500/30 text-xs font-bold text-green-300 transition-all">
+                → Student
+              </button>
+              <button onClick={() => { setEmail('parent@school.com'); setPassword('parent123'); setTimeout(() => handleSubmit(new Event('submit') as any), 100); }}
+                className="py-2 px-3 rounded-xl bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/30 text-xs font-bold text-amber-300 transition-all">
+                → Parent
+              </button>
+            </div>
+          </div>
         </div>
         
         <p className="text-center text-gray-500 text-sm mt-10">
