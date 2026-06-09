@@ -30,16 +30,16 @@ jobs:
     
     - name: Create ZIP Archive
       run: |
-        cd mobile_app/build/windows/x64/runner/Release
-        Compress-Archive -Path . -DestinationPath AttendanceAI-Windows.zip
-        Move-Item AttendanceAI-Windows.zip ../../../../
+        $buildPath = "mobile_app/build/windows/x64/runner/Release"
+        $zipPath = "AttendanceAI-Windows.zip"
+        Compress-Archive -Path $buildPath -DestinationPath $zipPath
       shell: pwsh
     
     - name: Upload Build Artifacts
       uses: actions/upload-artifact@v4
       with:
         name: AttendanceAI-Windows
-        path: mobile_app/AttendanceAI-Windows.zip
+        path: AttendanceAI-Windows.zip
         retention-days: 30
     
     - name: Create Release
