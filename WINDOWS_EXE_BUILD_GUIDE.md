@@ -60,7 +60,7 @@ When you push to `main`:
 
 ### After Build Completes:
 
-1. Go to: https://github.com/calvinceoyugah2-del/face-recognition-attendance
+1. Go to: https://github.com/rootzilla123/face-recognition-attendance
 2. Click "Actions" tab
 3. Find the latest "Build Windows Desktop App" workflow
 4. Click on it
@@ -271,8 +271,8 @@ Everything is ready. Just:
 
 ## 🔗 Quick Links
 
-- GitHub Repo: https://github.com/calvinceoyugah2-del/face-recognition-attendance
-- Actions Tab: https://github.com/calvinceoyugah2-del/face-recognition-attendance/actions
+- GitHub Repo: https://github.com/rootzilla123/face-recognition-attendance
+- Actions Tab: https://github.com/rootzilla123/face-recognition-attendance/actions
 - Workflow File: `.github/workflows/windows-build.yml`
 
 ---
