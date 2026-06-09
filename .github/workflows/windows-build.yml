@@ -1,0 +1,51 @@
+name: Build Windows Desktop App
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - uses: subosito/flutter-action@v2
+      with:
+        flutter-version: '3.29.3'
+        channel: 'stable'
+    
+    - name: Enable Windows Desktop
+      run: flutter config --enable-windows-desktop
+    
+    - name: Get Flutter Dependencies
+      run: flutter pub get
+      working-directory: mobile_app
+    
+    - name: Build Windows App
+      run: flutter build windows --release
+      working-directory: mobile_app
+    
+    - name: Create ZIP Archive
+      run: |
+        cd mobile_app/build/windows/x64/runner/Release
+        Compress-Archive -Path . -DestinationPath AttendanceAI-Windows.zip
+        Move-Item AttendanceAI-Windows.zip ../../../../
+      shell: pwsh
+    
+    - name: Upload Build Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: AttendanceAI-Windows
+        path: mobile_app/AttendanceAI-Windows.zip
+        retention-days: 30
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      if: startsWith(github.ref, 'refs/tags/')
+      with:
+        files: mobile_app/AttendanceAI-Windows.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
