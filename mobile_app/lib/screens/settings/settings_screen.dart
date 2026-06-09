@@ -1,14 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/camera_provider.dart';
+import '../../providers/auth_provider.dart';
 import '../../core/models/camera.dart';
 import '../../core/utils/app_theme.dart';
 import '../../core/utils/helpers.dart';
 import '../../core/utils/server_config.dart';
-import '../../core/services/auth_service.dart';
 import '../auth/login_screen.dart';
 import '../../core/services/health_service.dart';
 import '../../widgets/common/gradient_header.dart';
+// Import the new screens for Help and Feedback
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -122,6 +123,8 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
 
 
   Future<void> _logout() async {
+    final nav = Navigator.of(context);
+    final auth = context.read<AuthProvider>();
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -134,8 +137,8 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
       ),
     );
     if (confirm == true) {
-      await AuthService.logout();
-      if (mounted) Navigator.pushAndRemoveUntil(context, MaterialPageRoute(builder: (_) => const LoginScreen()), (_) => false);
+      await auth.logout();
+      if (mounted) nav.pushAndRemoveUntil(MaterialPageRoute(builder: (_) => const LoginScreen()), (_) => false);
     }
   }
 
@@ -337,6 +340,17 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
                   ),
                 ),
 
+                // --- Help & Feedback Section ---
+                const SizedBox(height: 12), // Space before Help & Feedback
+                Card(
+                  child: Column(children: [
+                    _menuItem(context, Icons.help_outline, 'Help & Support', () => _navigateToHelpScreen(context)),
+                    const Divider(height: 1),
+                    _menuItem(context, Icons.feedback_outlined, 'Feedback', () => _navigateToFeedbackScreen(context)),
+                  ]),
+                ),
+                // --- End Help & Feedback Section ---
+
                 const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
@@ -365,4 +379,31 @@ class _SettingsScreenState extends State<SettingsScreen> with SingleTickerProvid
     trailing: Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.gray900)),
     dense: true,
   );
+
+  Widget _menuItem(BuildContext context, IconData icon, String label, VoidCallback onTap, {Color? color}) {
+    return ListTile(
+      leading: Icon(icon, color: color ?? AppColors.gray600, size: 20),
+      title: Text(label, style: TextStyle(color: color ?? AppColors.gray900, fontSize: 14)),
+      trailing: color == null ? const Icon(Icons.chevron_right, color: AppColors.gray400, size: 18) : null,
+      onTap: onTap,
+      dense: true,
+    );
+  }
+
+  // Navigation functions for Help & Feedback
+  void _navigateToHelpScreen(BuildContext context) {
+    showDialog(context: context, builder: (_) => AlertDialog(
+      title: const Text('Help & Support'),
+      content: const Text('For support, contact support@attendanceai.example.com'),
+      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))],
+    ));
+  }
+
+  void _navigateToFeedbackScreen(BuildContext context) {
+    showDialog(context: context, builder: (_) => AlertDialog(
+      title: const Text('Feedback'),
+      content: const Text('Send feedback to support@attendanceai.example.com'),
+      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('OK'))],
+    ));
+  }
 }

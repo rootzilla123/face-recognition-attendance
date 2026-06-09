@@ -1,12 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import RouteGuard from '../components/RouteGuard';
-import { getToken } from '@/lib/auth';
 import { api } from '@/lib/api';
-
-const API = typeof window !== 'undefined'
-  ? `${window.location.protocol}//${window.location.hostname}:8001`
-  : 'http://localhost:8001';
 
 function TeacherProfileContent() {
   const [profile, setProfile] = useState<any>(null);
@@ -16,7 +11,7 @@ function TeacherProfileContent() {
 
   useEffect(() => {
     Promise.all([
-      fetch(`${API}/api/v1/admin/teacher/me`, { headers: { Authorization: `Bearer ${getToken()}` } }).then(r => r.ok ? r.json() : null),
+      api.get('/admin/teacher/me').catch(() => null),
       api.getCameras(),
       api.getTodayAttendance(),
     ]).then(([p, c, a]) => {

@@ -17,11 +17,9 @@ class NotificationService {
     if (!_initialized) return;
     const details = NotificationDetails(
       android: AndroidNotificationDetails(
-        'attendance_channel',
-        'Attendance Alerts',
+        'attendance_channel', 'Attendance Alerts',
         channelDescription: 'Live face recognition attendance events',
-        importance: Importance.high,
-        priority: Priority.high,
+        importance: Importance.high, priority: Priority.high,
         icon: '@mipmap/ic_launcher',
       ),
     );
@@ -32,4 +30,25 @@ class NotificationService {
       details,
     );
   }
+
+  static Future<void> showCameraOffline(String cameraName) async {
+    if (!_initialized) return;
+    const details = NotificationDetails(
+      android: AndroidNotificationDetails(
+        'camera_alerts',
+        'Camera Alerts',
+        channelDescription: 'Camera health status alerts',
+        importance: Importance.high,
+        priority: Priority.high,
+        icon: '@mipmap/ic_launcher',
+      ),
+    );
+    await _plugin.show(
+      DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      '⚠️ Camera Offline',
+      '$cameraName has gone offline',
+      details,
+    );
+  }
 }
+

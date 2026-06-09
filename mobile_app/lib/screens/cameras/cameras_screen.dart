@@ -5,6 +5,7 @@ import '../../providers/websocket_provider.dart';
 import '../../core/models/camera.dart';
 import '../../core/utils/app_theme.dart';
 import '../../core/utils/helpers.dart';
+import '../../core/utils/responsive.dart';
 import '../../core/api/endpoints.dart';
 import '../../widgets/common/gradient_header.dart';
 import '../../widgets/camera/mjpeg_view.dart';
@@ -17,6 +18,7 @@ class CamerasScreen extends StatefulWidget {
 }
 
 class _CamerasScreenState extends State<CamerasScreen> {
+
   @override
   void initState() {
     super.initState();
@@ -58,7 +60,6 @@ class _CamerasScreenState extends State<CamerasScreen> {
   @override
   Widget build(BuildContext context) {
     final prov = context.watch<CameraProvider>();
-    final active = prov.cameras.where((c) => c.isActive).toList();
 
     return Scaffold(
       body: RefreshIndicator(
@@ -110,11 +111,16 @@ class _CamerasScreenState extends State<CamerasScreen> {
                         )
                       : SliverList(
                           delegate: SliverChildBuilderDelegate(
-                            (ctx, i) => Padding(
-                              padding: const EdgeInsets.only(bottom: 12),
-                              child: _CameraCard(camera: active[i], onDelete: () => _confirmDelete(active[i])),
+                            (ctx, i) => Center(
+                              child: ConstrainedBox(
+                                constraints: BoxConstraints(maxWidth: Responsive.isDesktop(context) ? 1200 : double.infinity),
+                                child: Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: _CameraCard(camera: prov.cameras[i], onDelete: () => _confirmDelete(prov.cameras[i])),
+                                ),
+                              ),
                             ),
-                            childCount: active.length,
+                            childCount: prov.cameras.length,
                           ),
                         ),
             ),

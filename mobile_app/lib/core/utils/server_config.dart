@@ -4,10 +4,9 @@ class ServerConfig {
   static const _apiKey = 'server_base_url';
   static const _pbKey = 'pocketbase_url';
 
-  // Production defaults — point to Cloudflare tunnel domains.
-  // User can override in Settings screen for local dev.
-  static const defaultUrl = 'https://api.shadomfacepro.duckdns.org';
-  static const defaultPbUrl = 'https://pb.shadomfacepro.duckdns.org';
+  // LOCAL DEVELOPMENT - configured by configure_local.sh
+  static const defaultUrl = 'http://172.22.186.189:8001';
+  static const defaultPbUrl = 'http://172.22.186.189:8092';
 
   static String _current = defaultUrl;
   static String _pbCurrent = defaultPbUrl;

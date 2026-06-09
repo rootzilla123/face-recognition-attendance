@@ -22,14 +22,14 @@ class Student {
   });
 
   factory Student.fromJson(Map<String, dynamic> j) => Student(
-        id: j['id'].toString(),
-        studentId: j['student_id'],
-        fullName: j['full_name'],
-        gradeLevel: j['grade_level'],
-        section: j['section'],
-        parentName: j['parent_name'],
-        parentPhone: j['parent_phone'],
-        parentEmail: j['parent_email'],
+        id: j['id']?.toString() ?? '',
+        studentId: j['student_id']?.toString() ?? '',
+        fullName: j['full_name']?.toString() ?? j['name']?.toString() ?? 'Unknown',
+        gradeLevel: j['grade_level']?.toString() ?? '',
+        section: j['section']?.toString(),
+        parentName: j['parent_name']?.toString(),
+        parentPhone: j['parent_phone']?.toString() ?? '',
+        parentEmail: j['parent_email']?.toString() ?? '',
         isActive: j['is_active'] ?? true,
       );
 }

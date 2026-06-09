@@ -1,11 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import RouteGuard from '../components/RouteGuard';
-import { getToken } from '@/lib/auth';
-
-const API = typeof window !== 'undefined'
-  ? `${window.location.protocol}//${window.location.hostname}:8001`
-  : 'http://localhost:8001';
+import { api } from '@/lib/api';
 
 function PreferencesContent() {
   const [prefs, setPrefs] = useState({ sms: true, email: true, in_app: true, language: 'en' });
@@ -13,18 +9,14 @@ function PreferencesContent() {
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    fetch(`${API}/api/v1/notifications/preferences`, {
-      headers: { Authorization: `Bearer ${getToken()}` }
-    }).then(r => r.ok ? r.json() : null).then(d => { if (d?.preferences) setPrefs(d.preferences); }).catch(() => {});
+    api.get('/notifications/preferences')
+      .then((d: any) => { if (d?.preferences) setPrefs(d.preferences); })
+      .catch(() => {});
   }, []);
 
   const save = async () => {
     setSaving(true); setSaved(false);
-    await fetch(`${API}/api/v1/notifications/preferences`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${getToken()}` },
-      body: JSON.stringify(prefs),
-    });
+    await api.put('/notifications/preferences', prefs).catch(console.error);
     setSaving(false); setSaved(true);
     setTimeout(() => setSaved(false), 3000);
   };

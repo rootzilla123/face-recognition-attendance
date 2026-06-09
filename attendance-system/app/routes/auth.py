@@ -7,6 +7,8 @@ from datetime import datetime
 from uuid import UUID
 from slowapi import Limiter
 from slowapi.util import get_remote_address
+import httpx
+import os
 
 from app.database import get_db
 from app.models import User, UserRole, Student, Teacher, Parent
@@ -14,6 +16,7 @@ from app.services.auth import (
     hash_password, authenticate_user, create_access_token, get_user_by_email
 )
 from app.dependencies import get_current_user
+from app.config import settings
 
 router = APIRouter()
 limiter = Limiter(key_func=get_remote_address)
@@ -170,7 +173,7 @@ async def register_teacher(
 
     # Also create in PocketBase so the teacher can log in
     import httpx
-    PB_URL = "http://localhost:8090"
+    PB_URL = os.environ.get("PB_URL", "http://localhost:8092")
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             r = await client.post(
@@ -259,10 +262,163 @@ async def send_password_reset(
 ):
     """Admin: trigger password reset email via PocketBase"""
     import httpx
-    PB_URL = "http://localhost:8091"
+    PB_URL = os.environ.get("PB_URL", "http://localhost:8092")
     async with httpx.AsyncClient(timeout=10.0) as client:
         r = await client.post(
             f"{PB_URL}/api/collections/users/request-password-reset",
             json={"email": data.email}
         )
     return {"message": "Reset email sent if account exists"}
+
+
+# ---------- Google / Firebase Sign-In ----------
+
+class GoogleAuthRequest(BaseModel):
+    firebase_token: str
+    default_role: str = "student"
+
+PB_URL = os.environ.get("PB_URL", "http://localhost:8092")
+
+@router.post("/google")
+async def google_sign_in(data: GoogleAuthRequest):
+    """
+    Verify a Firebase ID token, then find-or-create the user in PocketBase
+    and return a PocketBase auth token.
+    """
+    # 1. Verify Firebase token
+    try:
+        import firebase_admin
+        from firebase_admin import auth as fb_auth, credentials
+
+        # Initialise the app once (idempotent)
+        if not firebase_admin._apps:
+            sa_path = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "") or settings.google_application_credentials
+            if sa_path and os.path.exists(sa_path):
+                cred = credentials.Certificate(sa_path)
+            else:
+                cred = credentials.ApplicationDefault()
+            firebase_admin.initialize_app(cred, {"projectId": settings.firebase_project_id})
+
+        decoded = fb_auth.verify_id_token(data.firebase_token)
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"Invalid Firebase token: {e}")
+
+    email: str = decoded.get("email", "")
+    name: str = decoded.get("name", email.split("@")[0])
+    if not email:
+        raise HTTPException(status_code=400, detail="Firebase token has no email")
+
+    # 2. Find or create user in PocketBase
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        # Get PocketBase admin token
+        admin_res = await client.post(
+            f"{PB_URL}/api/collections/_superusers/auth-with-password",
+            json={"identity": settings.pb_admin_email, "password": settings.pb_admin_password},
+        )
+        if admin_res.status_code != 200:
+            raise HTTPException(status_code=500, detail="PocketBase admin auth failed")
+        admin_token = admin_res.json()["token"]
+        admin_headers = {"Authorization": admin_token}
+
+        # Check if user exists
+        search_res = await client.get(
+            f"{PB_URL}/api/collections/users/records",
+            params={"filter": f'email="{email}"', "perPage": 1},
+            headers=admin_headers,
+        )
+        items = search_res.json().get("items", [])
+
+        if items:
+            pb_user_id = items[0]["id"]
+            # Auth as that user via impersonation (admin token exchange)
+            auth_res = await client.post(
+                f"{PB_URL}/api/collections/users/impersonate/{pb_user_id}",
+                headers=admin_headers,
+                json={},
+            )
+            if auth_res.status_code != 200:
+                raise HTTPException(status_code=500, detail=f"PocketBase impersonate failed: {auth_res.text}")
+
+            auth_data = auth_res.json()
+            return {"token": auth_data["token"], "record": auth_data["record"], "is_new": False}
+        else:
+            # User does not exist. If we are just detecting, return now.
+            if data.default_role == "detect":
+                return {"is_new": True}
+
+            # Create the user
+            import secrets
+            tmp_password = secrets.token_urlsafe(24)
+            create_res = await client.post(
+                f"{PB_URL}/api/collections/users/records",
+                headers=admin_headers,
+                json={
+                    "email": email,
+                    "password": tmp_password,
+                    "passwordConfirm": tmp_password,
+                    "name": name,
+                    "role": data.default_role,
+                    "emailVisibility": True,
+                    "verified": True,
+                },
+            )
+            if create_res.status_code not in (200, 201):
+                raise HTTPException(status_code=500, detail=f"Could not create PocketBase user: {create_res.text}")
+            
+            pb_user_id = create_res.json()["id"]
+            auth_res = await client.post(
+                f"{PB_URL}/api/collections/users/impersonate/{pb_user_id}",
+                headers=admin_headers,
+                json={},
+            )
+            if auth_res.status_code != 200:
+                raise HTTPException(status_code=500, detail=f"PocketBase impersonate failed post-create: {auth_res.text}")
+
+            auth_data = auth_res.json()
+            return {"token": auth_data["token"], "record": auth_data["record"], "is_new": True}
+
+
+# ---------- Device Token Management ----------
+
+class DeviceTokenRequest(BaseModel):
+    token: str
+    platform: str = "android"  # android or ios
+
+@router.post("/device-token")
+def register_device_token(
+    data: DeviceTokenRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Register a device token for push notifications"""
+    if not data.token:
+        raise HTTPException(status_code=400, detail="Token is required")
+    
+    # Get current tokens
+    tokens = current_user.device_tokens or []
+    
+    # Add token if not already present
+    if data.token not in tokens:
+        tokens.append(data.token)
+        current_user.device_tokens = tokens
+        db.commit()
+        return {"message": "Device token registered", "token_count": len(tokens)}
+    
+    return {"message": "Token already registered", "token_count": len(tokens)}
+
+@router.delete("/device-token")
+def unregister_device_token(
+    data: DeviceTokenRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Remove a device token (e.g., on logout)"""
+    tokens = current_user.device_tokens or []
+    
+    if data.token in tokens:
+        tokens.remove(data.token)
+        current_user.device_tokens = tokens
+        db.commit()
+        return {"message": "Device token removed", "token_count": len(tokens)}
+    
+    return {"message": "Token not found", "token_count": len(tokens)}

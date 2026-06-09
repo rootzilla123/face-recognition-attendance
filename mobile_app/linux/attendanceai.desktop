@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=AttendanceAI
+GenericName=Face Recognition Attendance
+Comment=Smart Face Recognition Attendance System
+Exec=attendanceai
+Icon=attendanceai
+Terminal=false
+Categories=Office;Utility;Education;
+Keywords=attendance;face;recognition;ai;biometric;
+StartupNotify=true
+StartupWMClass=attendanceai

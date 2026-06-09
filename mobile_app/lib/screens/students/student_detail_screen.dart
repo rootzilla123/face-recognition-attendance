@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:provider/provider.dart';
 import '../../core/models/student.dart';
 import '../../core/models/attendance.dart';
 import '../../core/services/attendance_service.dart';
+import '../../core/services/pocketbase_service.dart';
+import '../../providers/auth_provider.dart';
 import '../../core/api/endpoints.dart';
 import '../../core/utils/helpers.dart';
 import '../../core/utils/app_theme.dart';
 import '../../widgets/common/error_state.dart';
+import '../teacher/manage_marks_screen.dart';
 
 class StudentDetailScreen extends StatefulWidget {
   final Student student;
@@ -75,6 +79,7 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
                     borderRadius: BorderRadius.circular(40),
                     child: CachedNetworkImage(
                       imageUrl: photoUrl,
+                      httpHeaders: PocketBaseService.authHeaders,
                       width: 80, height: 80,
                       fit: BoxFit.cover,
                       placeholder: (_, __) => Container(
@@ -177,6 +182,30 @@ class _StudentDetailScreenState extends State<StudentDetailScreen> {
       if (s.parentName != null) ...[const Divider(height: 20), _infoRow(Icons.person_outline, 'Parent Name', s.parentName!)],
       const Divider(height: 20),
       _infoRow(Icons.check_circle_outline, 'Status', s.isActive ? 'Active' : 'Inactive'),
+      
+      // Manage Marks button for teachers/admins
+      Consumer<AuthProvider>(
+        builder: (context, auth, _) {
+          if (auth.user?.role == 'teacher' || auth.user?.role == 'admin') {
+            return Column(children: [
+              const Divider(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => ManageMarksScreen(student: s))),
+                  icon: const Icon(Icons.assignment_outlined),
+                  label: const Text('Manage Examination Marks'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.secondary600,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+            ]);
+          }
+          return const SizedBox.shrink();
+        },
+      ),
     ]),
   );
 

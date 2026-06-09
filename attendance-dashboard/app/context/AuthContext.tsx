@@ -23,7 +23,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     return null;
   });
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  // Hydration: mark loading as done once we've checked the auth store
+  useEffect(() => {
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
     return pb.authStore.onChange(() => {

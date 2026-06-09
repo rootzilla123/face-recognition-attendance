@@ -5,10 +5,6 @@ import { useAuth } from '../context/AuthContext';
 import RouteGuard from '../components/RouteGuard';
 import { pb } from '@/lib/pocketbase';
 
-const API = typeof window !== 'undefined'
-  ? `${window.location.protocol}//${window.location.hostname}:8001`
-  : 'http://localhost:8001';
-
 function ProfileContent() {
   const { user } = useAuth();
   const [profile, setProfile] = useState<any>(null);
@@ -34,15 +30,10 @@ function ProfileContent() {
     setEnrolling(true); setEnrollMsg('');
     try {
       const formData = new FormData();
-      formData.append('student_id', profile.student_id);
-      formData.append('full_name', profile.full_name);
-      formData.append('grade_level', profile.grade_level);
-      if (profile.section) formData.append('section', profile.section);
-      formData.append('parent_phone', profile.parent_phone || '');
-      formData.append('parent_email', profile.parent_email || user?.email || '');
       formData.append('photo', photo);
-
-      const res = await fetch(`${API}/api/v1/students`, {
+      // Use the correct re-enroll endpoint
+      const apiBase = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8001';
+      const res = await fetch(`${apiBase}/api/v1/students/${profile.student_id}/enroll-face`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${pb.authStore.token}` },
         body: formData,

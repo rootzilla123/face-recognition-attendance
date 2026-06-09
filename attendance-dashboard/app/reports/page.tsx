@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 import { api } from '@/lib/api';
 import RouteGuard from '../components/RouteGuard';
 
@@ -13,6 +14,15 @@ const exportCSV = (records: any[], filename: string) => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a'); a.href = url; a.download = filename; a.click();
   URL.revokeObjectURL(url);
+};
+
+const exportExcel = (data: any, title: string) => {
+  const records = data?.records || data?.grades || [];
+  if (!records.length) return;
+  const ws = XLSX.utils.json_to_sheet(records);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Report');
+  XLSX.writeFile(wb, `${title.replace(/\s+/g, '-').toLowerCase()}.xlsx`);
 };
 
 const exportPDF = (data: any, title: string) => {
@@ -90,6 +100,8 @@ function ReportsContent() {
               className="px-5 py-2.5 bg-green-600 text-white rounded-xl text-sm font-semibold hover:opacity-90 transition">⬇ CSV</button>
             <button onClick={() => exportPDF(data, `${tab} Report`)}
               className="px-5 py-2.5 bg-red-600 text-white rounded-xl text-sm font-semibold hover:opacity-90 transition">⬇ PDF</button>
+            <button onClick={() => exportExcel(data, `${tab} Report`)}
+              className="px-5 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-semibold hover:opacity-90 transition">⬇ Excel</button>
           </>)}
         </div>
         {error && <p className="text-red-500 text-sm mt-3">{error}</p>}

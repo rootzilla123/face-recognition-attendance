@@ -4,12 +4,6 @@ from datetime import datetime
 from enum import Enum
 from uuid import UUID
 
-class CameraLocation(str, Enum):
-    MAIN_GATE = "main_gate"
-    CLASSROOM_BUILDING = "classroom_building"
-    CAFETERIA = "cafeteria"
-    EXIT_GATE = "exit_gate"
-
 class NotificationPreferences(BaseModel):
     sms: bool = True
     email: bool = True
@@ -43,8 +37,13 @@ class StudentResponse(BaseModel):
 
 class AttendanceRecordCreate(BaseModel):
     student_id: str
-    camera_location: CameraLocation
+    camera_location: str  # free-text — cameras use dynamic locations
     confidence_score: float = Field(..., ge=0.90, le=1.00)
+    timestamp: Optional[datetime] = None
+
+class ManualAttendanceCreate(BaseModel):
+    student_id: str
+    location: str = "Manual Entry"
     timestamp: Optional[datetime] = None
 
 class AttendanceRecordResponse(BaseModel):
@@ -54,7 +53,8 @@ class AttendanceRecordResponse(BaseModel):
     timestamp: datetime
     confidence_score: float
     face_image_url: Optional[str]
-    
+    clip_path: Optional[str] = None
+
     class Config:
         from_attributes = True
 

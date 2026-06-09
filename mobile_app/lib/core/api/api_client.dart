@@ -1,7 +1,14 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../services/pocketbase_service.dart';
 import 'endpoints.dart';
+
+class OfflineException implements Exception {
+  const OfflineException();
+  @override
+  String toString() => 'You are offline. Showing cached data.';
+}
 
 class ApiClient {
   final http.Client _client = http.Client();
@@ -11,23 +18,39 @@ class ApiClient {
   Map<String, String> _headers() => PocketBaseService.authHeaders;
 
   Future<dynamic> get(String path) async {
-    final res = await _client.get(_uri(path), headers: _headers());
-    return _handle(res);
+    try {
+      final res = await _client.get(_uri(path), headers: _headers());
+      return _handle(res);
+    } on SocketException {
+      throw const OfflineException();
+    }
   }
 
   Future<dynamic> post(String path, Map<String, dynamic> body) async {
-    final res = await _client.post(_uri(path), headers: _headers(), body: jsonEncode(body));
-    return _handle(res);
+    try {
+      final res = await _client.post(_uri(path), headers: _headers(), body: jsonEncode(body));
+      return _handle(res);
+    } on SocketException {
+      throw const OfflineException();
+    }
   }
 
   Future<dynamic> put(String path, Map<String, dynamic> body) async {
-    final res = await _client.put(_uri(path), headers: _headers(), body: jsonEncode(body));
-    return _handle(res);
+    try {
+      final res = await _client.put(_uri(path), headers: _headers(), body: jsonEncode(body));
+      return _handle(res);
+    } on SocketException {
+      throw const OfflineException();
+    }
   }
 
   Future<void> delete(String path) async {
-    final res = await _client.delete(_uri(path), headers: _headers());
-    if (res.statusCode >= 400) throw Exception('DELETE $path failed: ${res.statusCode}');
+    try {
+      final res = await _client.delete(_uri(path), headers: _headers());
+      if (res.statusCode >= 400) throw Exception('DELETE $path failed: ${res.statusCode}');
+    } on SocketException {
+      throw const OfflineException();
+    }
   }
 
   Future<dynamic> postMultipart(String path, Map<String, String> fields, {required http.MultipartFile file}) async {

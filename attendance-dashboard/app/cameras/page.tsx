@@ -2,7 +2,7 @@
 
 import RouteGuard from '../components/RouteGuard';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useWebSocket } from '@/lib/useWebSocket';
 import MJPEGCameraFeed from '@/app/components/MJPEGCameraFeed';
 import RecognitionOverlay from '@/app/components/RecognitionOverlay';
@@ -62,6 +62,8 @@ function CamerasContent() {
   const [cameraDetections, setCameraDetections] = useState<Record<string, Detection[]>>({});
   const [selectedCamera, setSelectedCamera] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastMessage | null>(null);
+  const [liveAlert, setLiveAlert] = useState<AttendanceNotification | null>(null);
+  const liveAlertTimer = useRef<NodeJS.Timeout | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' | 'warning') => {
     setToast({ message, type });
@@ -189,8 +191,13 @@ function CamerasContent() {
     }
   };
 
+  const wsUrl = (() => {
+    const apiBase = process.env.NEXT_PUBLIC_API_URL ?? `http://${typeof window !== 'undefined' ? window.location.hostname : 'localhost'}:8001`;
+    return apiBase.replace('https://', 'wss://').replace('http://', 'ws://') + '/ws/attendance';
+  })();
+
   const { isConnected } = useWebSocket({
-    url: `ws://${typeof window !== 'undefined' ? window.location.hostname : 'localhost'}:8001/ws/attendance`,
+    url: wsUrl,
     onMessage: (message) => {
       if (message.type === 'attendance_event') {
         const notification: AttendanceNotification = {
@@ -202,6 +209,11 @@ function CamerasContent() {
         };
         
         setNotifications(prev => [notification, ...prev].slice(0, 10));
+
+        // Show live alert banner
+        setLiveAlert(notification);
+        if (liveAlertTimer.current) clearTimeout(liveAlertTimer.current);
+        liveAlertTimer.current = setTimeout(() => setLiveAlert(null), 5000);
         
         const cameraId = cameras.find(c => c.location === message.camera_location)?.id;
         if (cameraId) {
@@ -278,6 +290,22 @@ function CamerasContent() {
         </div>
 
         <div className="max-w-7xl mx-auto px-6">
+
+        {/* Live Detection Banner */}
+        {liveAlert && (
+          <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 animate-bounce-once">
+            <div className="flex items-center gap-4 bg-green-500 text-white px-6 py-4 rounded-2xl shadow-2xl border border-green-400">
+              <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center text-2xl font-bold">
+                {liveAlert.studentName.charAt(0)}
+              </div>
+              <div>
+                <p className="font-bold text-lg">✅ {liveAlert.studentName} checked in!</p>
+                <p className="text-green-100 text-sm">{liveAlert.cameraLocation} · {(liveAlert.confidence * 100).toFixed(0)}% confidence</p>
+              </div>
+              <button onClick={() => setLiveAlert(null)} className="ml-4 text-white/70 hover:text-white text-xl">×</button>
+            </div>
+          </div>
+        )}
 
         {/* Loading State */}
         {isLoading && (

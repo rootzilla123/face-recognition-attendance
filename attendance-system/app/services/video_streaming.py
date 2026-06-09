@@ -1009,28 +1009,16 @@ from decimal import Decimal
 class AttendanceMarker:
     """
     Marks attendance automatically when students are recognized.
-    Integrates with DuplicateFilter and publishes attendance events.
+    Uses a fresh DB session per operation to avoid stale data.
     """
     
     def __init__(self, db: Session, duplicate_filter: DuplicateFilter):
-        """
-        Initialize the attendance marker.
-        
-        Args:
-            db: SQLAlchemy database session
-            duplicate_filter: DuplicateFilter instance
-        """
+        # Keep reference for backward compat but use fresh sessions per operation
         self.db = db
         self.duplicate_filter = duplicate_filter
         self.event_callbacks = []
         
     def add_event_callback(self, callback: callable):
-        """
-        Add a callback function to be called when attendance is marked.
-        
-        Args:
-            callback: Async function to call with attendance event data
-        """
         self.event_callbacks.append(callback)
         
     async def mark_attendance(
@@ -1038,82 +1026,94 @@ class AttendanceMarker:
         student_id: str,
         camera_location: str,
         timestamp: datetime,
-        confidence: float
+        confidence: float,
+        frame=None,
+        camera_id: int = None
     ) -> Optional[dict]:
-        """
-        Mark attendance for a student.
-        Checks for duplicates before creating record.
-        
-        Args:
-            student_id: Student identifier (CompreFace subject name)
-            camera_location: Camera location name
-            timestamp: Timestamp of recognition
-            confidence: Recognition confidence score (0.0-1.0)
-            
-        Returns:
-            dict: Attendance record data or None if duplicate/error
-        """
         try:
-            # Check for duplicate
+            # Check for duplicate first (uses Redis, no DB needed)
             is_duplicate = await self.duplicate_filter.is_duplicate(student_id, camera_location)
-            
             if is_duplicate:
-                time_since = await self.duplicate_filter.get_time_since_last_attendance(
-                    student_id, camera_location
-                )
-                logger.info(
-                    f"Duplicate attendance attempt for student {student_id} at {camera_location} "
-                    f"(last attendance: {time_since}s ago)"
-                )
                 return None
-            
-            # Find student by student_id (CompreFace subject name matches student_id field)
-            student = self.db.query(Student).filter(
-                Student.student_id == student_id
-            ).first()
-            
-            if not student:
-                logger.warning(f"Student not found in database: {student_id}")
+
+            # Use a fresh session for each attendance write
+            from app.database import SessionLocal
+            db = SessionLocal()
+            try:
+                student = db.query(Student).filter(Student.student_id == student_id).first()
+                if not student:
+                    logger.warning(f"Student not found in database: {student_id}")
+                    return None
+
+                attendance_record = AttendanceRecord(
+                    student_id=student.id,
+                    camera_location=camera_location,
+                    timestamp=timestamp,
+                    confidence_score=Decimal(str(confidence))
+                )
+                db.add(attendance_record)
+                db.commit()
+                db.refresh(attendance_record)
+
+                # Save face snapshot
+                try:
+                    import os
+                    from pathlib import Path
+                    snap_dir = Path("/var/attendance_clips") / "snapshots" / datetime.now().strftime("%Y-%m-%d")
+                    snap_dir.mkdir(parents=True, exist_ok=True)
+                    snap_path = snap_dir / f"{attendance_record.id}.jpg"
+                    import cv2 as _cv2
+                    _cv2.imwrite(str(snap_path), frame)
+                    attendance_record.face_image_url = str(snap_path)
+                    db.commit()
+                except Exception as snap_err:
+                    logger.warning(f"Could not save face snapshot: {snap_err}")
+
+                # Save video clip
+                if frame is not None and camera_id is not None and hasattr(self, 'clip_service'):
+                    try:
+                        clip_path = await self.clip_service.save_clip(
+                            camera_id=camera_id,
+                            attendance_id=str(attendance_record.id),
+                            detection_frame=frame
+                        )
+                        if clip_path:
+                            attendance_record.clip_path = clip_path
+                            db.commit()
+                    except Exception as e:
+                        logger.error(f"Failed to save video clip: {e}")
+
+                # Notify parents
+                try:
+                    from app.services.notification_service import notify_parents_of_attendance, NotificationService
+                    notify_parents_of_attendance(db, student, attendance_record, NotificationService())
+                except Exception as e:
+                    logger.error(f"Notification failed: {e}")
+
+                await self.duplicate_filter.cache_attendance(student_id, camera_location, timestamp)
+
+                logger.info(f"Attendance marked: {student.full_name} at {camera_location} ({confidence:.2f})")
+
+                attendance_event = {
+                    "attendance_id": str(attendance_record.id),
+                    "student_id": student_id,
+                    "student_name": student.full_name,
+                    "camera_location": camera_location,
+                    "timestamp": timestamp.isoformat(),
+                    "confidence_score": confidence
+                }
+                await self.publish_attendance_event(attendance_event)
+                return attendance_event
+
+            except Exception as e:
+                logger.error(f"Error marking attendance: {str(e)}")
+                db.rollback()
                 return None
-            
-            # Create attendance record
-            attendance_record = AttendanceRecord(
-                student_id=student.id,
-                camera_location=camera_location,
-                timestamp=timestamp,
-                confidence_score=Decimal(str(confidence))
-            )
-            
-            self.db.add(attendance_record)
-            self.db.commit()
-            self.db.refresh(attendance_record)
-            
-            # Cache attendance to prevent duplicates
-            await self.duplicate_filter.cache_attendance(student_id, camera_location, timestamp)
-            
-            logger.info(
-                f"Attendance marked for student {student.full_name} ({student_id}) "
-                f"at {camera_location} (confidence: {confidence:.2f})"
-            )
-            
-            # Prepare attendance event data
-            attendance_event = {
-                "attendance_id": str(attendance_record.id),
-                "student_id": student_id,
-                "student_name": student.full_name,
-                "camera_location": camera_location,
-                "timestamp": timestamp.isoformat(),
-                "confidence_score": confidence
-            }
-            
-            # Publish attendance event
-            await self.publish_attendance_event(attendance_event)
-            
-            return attendance_event
-            
+            finally:
+                db.close()
+
         except Exception as e:
-            logger.error(f"Error marking attendance: {str(e)}")
-            self.db.rollback()
+            logger.error(f"Error in mark_attendance: {str(e)}")
             return None
     
     async def publish_attendance_event(self, attendance_event: dict):
@@ -1364,6 +1364,14 @@ class VideoStreamingService:
         self.attendance_marker = AttendanceMarker(db, self.duplicate_filter)
         self.stream_broadcaster = StreamBroadcaster(websocket_manager, max_fps=2)
         
+        # Initialize video clip service
+        from app.services.video_clip_service import VideoClipService
+        from app.config import settings as _settings
+        clips_dir = getattr(_settings, "clips_dir", "/var/attendance_clips")
+        retention_days = getattr(_settings, "clips_retention_days", 7)
+        self.clip_service = VideoClipService(clips_dir=clips_dir, retention_days=retention_days)
+        self.attendance_marker.clip_service = self.clip_service
+        
         # API request throttling - limit concurrent CompreFace API requests to 8
         self.api_semaphore = asyncio.Semaphore(8)
         
@@ -1429,9 +1437,12 @@ class VideoStreamingService:
                 if not success or frame is None:
                     await asyncio.sleep(0.1)
                     continue
-                
+
                 timestamp = datetime.now()
-                
+
+                # Feed frame into the rolling clip buffer (pre-detection window)
+                self.clip_service.add_frame(camera_id, frame)
+
                 # Use Recognition API which includes detection + recognition in one call
                 # This is more efficient and gives us bounding boxes with recognition results
                 async with self.api_semaphore:
@@ -1448,10 +1459,17 @@ class VideoStreamingService:
                     detection_data = []
                     
                     try:
-                        response = requests.post(
-                            self.face_recognizer.recognition_endpoint,
-                            headers=headers,
-                            files=files,
+                        loop = asyncio.get_event_loop()
+                        response = await asyncio.wait_for(
+                            loop.run_in_executor(
+                                None,
+                                lambda: requests.post(
+                                    self.face_recognizer.recognition_endpoint,
+                                    headers=headers,
+                                    files=files,
+                                    timeout=8
+                                )
+                            ),
                             timeout=10
                         )
                         
@@ -1478,13 +1496,17 @@ class VideoStreamingService:
                                         student_id = subject.get("subject", "")
                                         
                                         if confidence >= self.face_recognizer.confidence_threshold:
-                                            # Get student full name from database
+                                            # Get student full name from database (fresh session)
                                             from app.models import Student
-                                            student = self.db.query(Student).filter(
-                                                Student.student_id == student_id
-                                            ).first()
-                                            
-                                            student_name = student.full_name if student else student_id
+                                            from app.database import SessionLocal as _SL
+                                            _db = _SL()
+                                            try:
+                                                student = _db.query(Student).filter(
+                                                    Student.student_id == student_id
+                                                ).first()
+                                                student_name = student.full_name if student else student_id
+                                            finally:
+                                                _db.close()
                                             
                                             # Add recognized face
                                             detection_data.append({
@@ -1502,7 +1524,9 @@ class VideoStreamingService:
                                                 student_id=student_id,
                                                 camera_location=camera_location,
                                                 timestamp=timestamp,
-                                                confidence=confidence
+                                                confidence=confidence,
+                                                frame=frame,
+                                                camera_id=camera_id
                                             )
                                         else:
                                             # Low confidence - treat as unknown
@@ -1564,26 +1588,38 @@ class VideoStreamingService:
         
         if not success:
             logger.error(f"Failed to start camera {camera_id}")
-            # Update database status to error
-            camera = self.db.query(Camera).filter(Camera.id == int(camera_id)).first()
-            if camera:
-                camera.status = "error"
-                camera.error_message = "Failed to connect to camera"
-                self.db.commit()
-            
+            from app.database import SessionLocal as _SL
+            _db = _SL()
+            try:
+                camera = _db.query(Camera).filter(Camera.id == int(camera_id)).first()
+                if camera:
+                    camera.status = "error"
+                    camera.error_message = "Failed to connect to camera"
+                    _db.commit()
+            finally:
+                _db.close()
             await self.stream_broadcaster.broadcast_camera_status(
                 camera_id, "error", "Failed to connect to camera"
             )
             return False
         
         # Update database status to online
-        camera = self.db.query(Camera).filter(Camera.id == int(camera_id)).first()
-        if camera:
-            camera.status = "online"
-            camera.error_message = None
-            camera.last_seen = datetime.now()
-            self.db.commit()
-        
+        from app.database import SessionLocal as _SL2
+        _db2 = _SL2()
+        try:
+            camera = _db2.query(Camera).filter(Camera.id == int(camera_id)).first()
+            if camera:
+                camera.status = "online"
+                camera.error_message = None
+                camera.last_seen = datetime.now()
+                _db2.commit()
+        finally:
+            _db2.close()
+
+        # Initialise clip buffer and register live stream for post-detection capture
+        self.clip_service.init_camera_buffer(camera_id)
+        self.clip_service.register_stream_manager(camera_id, self.video_stream_manager)
+
         # Start processing pipeline
         task = asyncio.create_task(self._process_camera_pipeline(camera_id, location_name))
         self.processing_tasks[camera_id] = task
@@ -1615,10 +1651,15 @@ class VideoStreamingService:
         await self.video_stream_manager.stop_camera(camera_id)
         
         # Update database status to offline
-        camera = self.db.query(Camera).filter(Camera.id == int(camera_id)).first()
-        if camera:
-            camera.status = "offline"
-            self.db.commit()
+        from app.database import SessionLocal as _SL
+        _db = _SL()
+        try:
+            camera = _db.query(Camera).filter(Camera.id == int(camera_id)).first()
+            if camera:
+                camera.status = "offline"
+                _db.commit()
+        finally:
+            _db.close()
         
         # Broadcast camera offline status
         await self.stream_broadcaster.broadcast_camera_status(camera_id, "offline")
@@ -1628,25 +1669,23 @@ class VideoStreamingService:
     async def start(self):
         """Start the video streaming service and load cameras from database."""
         self.running = True
-        
-        # Start connection monitoring
         await self.video_stream_manager.start_monitoring()
-        
-        # Start resource monitoring
         asyncio.create_task(self.resource_monitor.adjust_frame_rate(self.frame_processor))
-        
-        # Load and start all active cameras from database
-        cameras = self.db.query(Camera).filter(Camera.is_active == True).all()
-        
-        for camera in cameras:
-            await self.start_camera(
-                str(camera.id),  # Use camera.id instead of camera.camera_id
-                camera.stream_url,
-                camera.protocol,
-                camera.location  # Use camera.location instead of camera.location_name
-            )
-        
-        logger.info(f"Video streaming service started with {len(cameras)} cameras")
+
+        from app.database import SessionLocal as _SL
+        _db = _SL()
+        try:
+            cameras = _db.query(Camera).filter(Camera.is_active == True).all()
+            camera_list = [(str(c.id), c.stream_url, c.protocol, c.location) for c in cameras]
+        finally:
+            _db.close()
+
+        async def _start_cameras():
+            for cam_id, url, protocol, location in camera_list:
+                await self.start_camera(cam_id, url, protocol, location)
+
+        asyncio.create_task(_start_cameras())
+        logger.info(f"Video streaming service started, loading {len(camera_list)} cameras in background")
     
     async def stop(self):
         """Stop the video streaming service and all cameras."""

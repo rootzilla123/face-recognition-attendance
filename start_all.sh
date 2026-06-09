@@ -162,7 +162,15 @@ PIDS+=($BACKEND_PID)
 
 log_success "Backend started (PID: $BACKEND_PID)"
 sleep 5
-wait_for_service 8001 "Backend API"
+if ! wait_for_service 8001 "Backend API" 60; then
+    log_error "Backend failed to become ready. Last backend log lines:"
+    if [ -f /tmp/backend.log ]; then
+        sed -n '1,200p' /tmp/backend.log
+    else
+        log_warning "/tmp/backend.log not found"
+    fi
+    exit 1
+fi
 log_success "Backend server is running on http://0.0.0.0:8001"
 
 # Start PocketBase
@@ -170,11 +178,11 @@ log_section "STARTING POCKETBASE"
 
 cd "$SCRIPT_DIR"
 log_info "Starting PocketBase..."
-./pocketbase serve --http=0.0.0.0:8091 > /tmp/pocketbase.log 2>&1 &
+./pocketbase serve --http=0.0.0.0:8092 > /tmp/pocketbase.log 2>&1 &
 POCKETBASE_PID=$!
 PIDS+=($POCKETBASE_PID)
 log_success "PocketBase started (PID: $POCKETBASE_PID)"
-wait_for_service 8091 "PocketBase"
+wait_for_service 8092 "PocketBase"
 
 # Start Frontend
 log_section "STARTING FRONTEND SERVER"

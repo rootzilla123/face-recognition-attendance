@@ -102,6 +102,67 @@ def student_report(
     }
 
 
+@router.get("/weekly-trend")
+def weekly_trend(
+    db: Session = Depends(get_db),
+    _=Depends(require_teacher_or_admin)
+):
+    """Last 7 days attendance rate trend"""
+    from datetime import timedelta
+    today = date.today()
+    total_students = db.query(Student).filter(Student.is_active == True).count()
+    result = []
+    for i in range(6, -1, -1):
+        day = today - timedelta(days=i)
+        start = datetime.combine(day, datetime.min.time())
+        end = datetime.combine(day, datetime.max.time())
+        present = db.query(AttendanceRecord.student_id).filter(
+            AttendanceRecord.timestamp >= start,
+            AttendanceRecord.timestamp <= end
+        ).distinct().count()
+        result.append({
+            "date": day.isoformat(),
+            "day": day.strftime("%a"),
+            "present": present,
+            "total": total_students,
+            "rate": round(present / total_students * 100, 1) if total_students else 0,
+        })
+    return {"trend": result}
+
+
+@router.get("/late-arrivals")
+def late_arrivals(
+    cutoff_hour: int = Query(default=8),
+    db: Session = Depends(get_db),
+    _=Depends(require_teacher_or_admin)
+):
+    """Students who arrived after cutoff_hour today"""
+    today = date.today()
+    start = datetime.combine(today, datetime.min.time())
+    end = datetime.combine(today, datetime.max.time())
+    records = db.query(AttendanceRecord, Student).join(
+        Student, AttendanceRecord.student_id == Student.id
+    ).filter(
+        AttendanceRecord.timestamp >= start,
+        AttendanceRecord.timestamp <= end,
+        func.extract('hour', AttendanceRecord.timestamp) >= cutoff_hour
+    ).order_by(AttendanceRecord.timestamp).all()
+
+    seen = set()
+    late = []
+    for r, s in records:
+        if s.id not in seen:
+            seen.add(s.id)
+            late.append({
+                "student_id": s.student_id,
+                "full_name": s.full_name,
+                "grade_level": s.grade_level,
+                "arrival_time": r.timestamp.strftime("%H:%M"),
+                "minutes_late": int((r.timestamp.hour * 60 + r.timestamp.minute) - cutoff_hour * 60),
+            })
+    return {"date": today.isoformat(), "cutoff": f"{cutoff_hour:02d}:00", "late_count": len(late), "records": late}
+
+
 @router.get("/grade-summary")
 def grade_summary(
     report_date: date = Query(default=None),

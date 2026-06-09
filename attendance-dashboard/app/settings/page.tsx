@@ -76,7 +76,7 @@ function SettingsContent() {
     setTestingCamera(cameraId);
     try {
       const response = await api.get(`/cameras/${cameraId}/status`);
-      showToast(`Camera Status: ${response.data.status}`, 'info');
+      showToast(`Camera Status: ${response.status || response.state || 'responded'}`, 'info');
     } catch (error) {
       showToast('Failed to test camera connection', 'error');
     } finally {

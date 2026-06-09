@@ -2,11 +2,13 @@
 import { useEffect, useState } from 'react';
 import RouteGuard from '../components/RouteGuard';
 import { api } from '@/lib/api';
+import FaceEnrollModal from '../components/FaceEnrollModal';
 
 function StudentsContent() {
   const [students, setStudents] = useState<any[]>([]);
   const [filtered, setFiltered] = useState<any[]>([]);
   const [search, setSearch] = useState('');
+  const [enrollTarget, setEnrollTarget] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -62,7 +64,7 @@ function StudentsContent() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
-                {['Student ID', 'Name', 'Grade', 'Section', 'Status'].map(h => (
+                {['Student ID', 'Name', 'Grade', 'Section', 'Status', ''].map(h => (
                   <th key={h} className="text-left px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
                 ))}
               </tr>
@@ -86,6 +88,14 @@ function StudentsContent() {
                       {s.is_active ? 'Active' : 'Inactive'}
                     </span>
                   </td>
+                  <td className="px-6 py-4">
+                    <button
+                      onClick={() => setEnrollTarget(s)}
+                      className="text-xs px-3 py-1.5 rounded-lg bg-purple-50 text-purple-600 hover:bg-purple-100 font-medium transition"
+                    >
+                      📷 Enroll Face
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -94,6 +104,13 @@ function StudentsContent() {
             Showing {filtered.length} of {students.length} students
           </div>
         </div>
+      )}
+      {enrollTarget && (
+        <FaceEnrollModal
+          student={enrollTarget}
+          onClose={() => setEnrollTarget(null)}
+          onSuccess={() => {}}
+        />
       )}
     </div>
   );

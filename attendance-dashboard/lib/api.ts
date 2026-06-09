@@ -61,6 +61,21 @@ export interface Notification {
   created_at: string;
 }
 
+export interface Mark {
+  id: string;
+  student_id: string;
+  student_name: string;
+  subject: string;
+  term: string;
+  score: number;
+  max_score: number;
+  percentage: number;
+  grade?: string;
+  remarks?: string;
+  is_published: boolean;
+  created_at: string;
+}
+
 class ApiClient {
   private baseUrl: string;
 
@@ -157,6 +172,11 @@ class ApiClient {
   async deleteFee(fee_id: string) { return this.request('DELETE', `/admin/fees/${fee_id}`); }
 
   // Reports
+  async getWeeklyTrend() { return this.request('GET', '/reports/weekly-trend'); }
+  async getLateArrivals(cutoffHour = 8) { return this.request('GET', `/reports/late-arrivals?cutoff_hour=${cutoffHour}`); }
+  async markManualAttendance(studentId: string, location: string) {
+    return this.request('POST', '/attendance/manual', { student_id: studentId, location });
+  }
   async getDailySummary(date?: string) {
     return this.request('GET', `/reports/daily-summary${date ? `?report_date=${date}` : ''}`);
   }
@@ -169,6 +189,35 @@ class ApiClient {
 
   // Cameras
   async getCameras() { return this.request('GET', '/cameras'); }
+
+  // Marks
+  async getMarks(student_id?: string, term?: string, subject?: string): Promise<Mark[]> {
+    let url = '/marks?';
+    if (student_id) url += `student_id=${student_id}&`;
+    if (term) url += `term=${term}&`;
+    if (subject) url += `subject=${subject}&`;
+    return this.request('GET', url);
+  }
+  async createMark(data: any): Promise<Mark> { return this.request('POST', '/marks', data); }
+  async updateMark(id: string, data: any): Promise<Mark> { return this.request('PUT', `/marks/${id}`, data); }
+  async deleteMark(id: string) { return this.request('DELETE', `/marks/${id}`); }
+  async publishMark(id: string) { return this.request('POST', `/marks/${id}/publish`); }
+  async getMyMarks(): Promise<Mark[]> { return this.request('GET', '/my-marks'); }
+  async getChildMarks(student_id: string): Promise<Mark[]> { return this.request('GET', `/child-marks/${student_id}`); }
+  async bulkUploadMarks(file: File, term: string): Promise<any> {
+    const formData = new FormData();
+    formData.append('file', file);
+    return this.request('POST', `/marks/bulk?term=${encodeURIComponent(term)}`, formData);
+  }
+  async getSubjectAnalytics(subject: string, term: string): Promise<any> {
+    return this.request('GET', `/marks/analytics/subject?subject=${encodeURIComponent(subject)}&term=${encodeURIComponent(term)}`);
+  }
+  async getConsolidatedReport(student_id: string, term: string): Promise<any> {
+    return this.request('GET', `/marks/consolidated/${student_id}?term=${encodeURIComponent(term)}`);
+  }
+  async getGradingSchemes(): Promise<any[]> { return this.request('GET', '/admin/grading-schemes'); }
+  async createGradingScheme(data: any) { return this.request('POST', '/admin/grading-schemes', data); }
+  async deleteGradingScheme(id: string) { return this.request('DELETE', `/admin/grading-schemes/${id}`); }
 }
 
 export const api = new ApiClient(API_BASE_URL);

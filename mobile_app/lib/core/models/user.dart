@@ -16,10 +16,10 @@ class AppUser {
   });
 
   factory AppUser.fromJson(Map<String, dynamic> j) => AppUser(
-        id: j['id'].toString(),
-        email: j['email'],
-        role: j['role'],
-        fullName: j['full_name'],
+        id: j['id']?.toString() ?? '',
+        email: j['email']?.toString() ?? '',
+        role: j['role']?.toString() ?? 'student',
+        fullName: j['full_name']?.toString() ?? j['name']?.toString() ?? '',
         isActive: j['is_active'] ?? true,
         isVerified: j['is_verified'] ?? false,
       );

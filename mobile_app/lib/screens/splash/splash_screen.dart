@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../shell.dart';
 import '../auth/login_screen.dart';
+import '../onboarding/onboarding_screen.dart';
 import '../../core/services/health_service.dart';
 import '../../core/services/auth_service.dart';
+import '../../core/utils/app_theme.dart';
+import '../../widgets/common/app_logo.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -11,7 +16,7 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
-  String _status = 'Starting up...';
+  String _status = 'Initializing...';
   bool _backendOk = false;
 
   @override
@@ -21,16 +26,23 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _init() async {
-    await Future.delayed(const Duration(milliseconds: 600));
-    if (mounted) setState(() => _status = 'Checking server...');
-    _backendOk = await HealthService.check();
-    if (mounted) setState(() => _status = _backendOk ? 'Connected ✓' : 'Server offline');
     await Future.delayed(const Duration(milliseconds: 800));
+    if (mounted) setState(() => _status = 'Optimizing connections...');
+    _backendOk = await HealthService.check();
+    if (mounted) setState(() => _status = _backendOk ? 'System Ready ✓' : 'Connecting to Cloud...');
+    await AuthService.loadSession().catchError((_) {});
+    await Future.delayed(const Duration(milliseconds: 1000));
     if (!mounted) return;
+    
     if (AuthService.isLoggedIn) {
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AppShell()));
     } else {
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+      final prefs = await SharedPreferences.getInstance();
+      final onboardingDone = prefs.getBool('onboarding_done') ?? false;
+      if (!mounted) return;
+      Navigator.pushReplacement(context, MaterialPageRoute(
+        builder: (_) => onboardingDone ? const LoginScreen() : const OnboardingScreen(),
+      ));
     }
   }
 
@@ -38,34 +50,64 @@ class _SplashScreenState extends State<SplashScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
+        width: double.infinity,
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [Color(0xFF0F172A), Color(0xFF1E1B4B), Color(0xFF0F172A)],
-            begin: Alignment.topLeft, end: Alignment.bottomRight,
+            colors: AppColors.meshDark,
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
           ),
         ),
-        child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Container(
-            width: 80, height: 80,
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [Color(0xFF3B82F6), Color(0xFF9333EA)]),
-              borderRadius: BorderRadius.circular(22),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const AppLogo(size: 100, showText: false)
+              .animate()
+              .scale(duration: 600.ms, curve: Curves.easeOutBack)
+              .shimmer(delay: 800.ms, duration: 2.seconds),
+            
+            const SizedBox(height: 32),
+            const Text('ShadomFacePro', 
+              style: TextStyle(color: Colors.white, fontSize: 36, fontWeight: FontWeight.w900, letterSpacing: -1.2)
+            ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.2),
+            
+            const Text('SMART ATTENDANCE REDEFINED', 
+              style: TextStyle(color: Colors.white60, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 3)
+            ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.2),
+            
+            const SizedBox(height: 60),
+            
+            // Loading and Status
+            SizedBox(
+              width: 200,
+              child: Column(
+                children: [
+                   ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      backgroundColor: Colors.white.withOpacity(0.1),
+                      valueColor: const AlwaysStoppedAnimation(Colors.white38),
+                      minHeight: 2,
+                    ),
+                  ).animate().fadeIn(delay: 600.ms),
+                  const SizedBox(height: 16),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 400),
+                    child: Text(_status, 
+                      key: ValueKey(_status),
+                      style: TextStyle(
+                        color: _backendOk ? const Color(0xFF4ADE80) : Colors.white38, 
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 0.5,
+                      )
+                    ),
+                  ),
+                ],
+              ),
             ),
-            child: const Center(child: Text('📸', style: TextStyle(fontSize: 40))),
-          ),
-          const SizedBox(height: 20),
-          const Text('AttendanceAI', style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 6),
-          const Text('Face Recognition System', style: TextStyle(color: Colors.white54, fontSize: 14)),
-          const SizedBox(height: 40),
-          const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54)),
-          const SizedBox(height: 16),
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 300),
-            child: Text(_status, key: ValueKey(_status),
-              style: TextStyle(color: _backendOk ? const Color(0xFF4ADE80) : Colors.white54, fontSize: 13)),
-          ),
-        ])),
+          ],
+        ),
       ),
     );
   }

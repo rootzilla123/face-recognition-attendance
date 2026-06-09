@@ -3,13 +3,18 @@ import { useEffect, useState } from 'react';
 import RouteGuard from '../components/RouteGuard';
 import { getToken } from '@/lib/auth';
 
-const API = 'http://localhost:8001';
+const API = typeof window !== 'undefined'
+  ? `${window.location.protocol}//${window.location.hostname}:8001`
+  : 'http://localhost:8001';
 
 function AdminUsersPage() {
   const [users, setUsers] = useState<any[]>([]);
   const [teachers, setTeachers] = useState<any[]>([]);
   const [cameras, setCameras] = useState<any[]>([]);
-  const [tab, setTab] = useState<'users' | 'cameras' | 'enrollment' | 'fees'>('users');
+  const [tab, setTab] = useState<'users' | 'cameras' | 'enrollment' | 'fees' | 'settings' | 'audit'>('users');
+  const [sysSettings, setSysSettings] = useState<any>(null);
+  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [savingSettings, setSavingSettings] = useState(false);
   const [enrollment, setEnrollment] = useState<any>(null);
   const [students, setStudents] = useState<any[]>([]);
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
@@ -45,6 +50,13 @@ function AdminUsersPage() {
       fetch(`${API}/api/v1/students`, auth()).then(r => r.ok ? r.json() : []),
     ]);
     setUsers(u); setTeachers(t); setCameras(c); setEnrollment(e); setStudents(s);
+    // Load system settings and audit logs
+    const [ss, al] = await Promise.all([
+      fetch(`${API}/api/v1/admin/system-settings`, auth()).then(r => r.ok ? r.json() : null),
+      fetch(`${API}/api/v1/admin/audit-logs?limit=50`, auth()).then(r => r.ok ? r.json() : []),
+    ]);
+    setSysSettings(ss);
+    setAuditLogs(al);
     setLoading(false);
   };
 
@@ -141,10 +153,10 @@ function AdminUsersPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 bg-gray-100 p-1 rounded-xl w-fit">
-        {(['users', 'cameras', 'enrollment', 'fees'] as const).map(t => (
-          <button key={t} onClick={() => { setTab(t); if (t === 'enrollment') loadEnrollment(); }} className={`px-5 py-2 rounded-lg text-sm font-semibold capitalize transition ${tab === t ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
-            {t === 'users' ? '👥 Users' : t === 'cameras' ? '📹 Camera Assignments' : t === 'enrollment' ? '🎭 Face Enrollment' : '💰 Fees'}
+      <div className="flex flex-wrap gap-2 bg-gray-100 p-1 rounded-xl w-fit">
+        {(['users', 'cameras', 'enrollment', 'fees', 'settings', 'audit'] as const).map(t => (
+          <button key={t} onClick={() => { setTab(t); if (t === 'enrollment') loadEnrollment(); }} className={`px-4 py-2 rounded-lg text-sm font-semibold capitalize transition ${tab === t ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
+            {t === 'users' ? '👥 Users' : t === 'cameras' ? '📹 Cameras' : t === 'enrollment' ? '🎭 Enrollment' : t === 'fees' ? '💰 Fees' : t === 'settings' ? '⚙️ Settings' : '📋 Audit Log'}
           </button>
         ))}
       </div>
@@ -231,8 +243,8 @@ function AdminUsersPage() {
                             <td className="px-5 py-3 text-gray-600">{s.grade_level}</td>
                             <td className="px-5 py-3 text-gray-600">{s.section || '—'}</td>
                             <td className="px-5 py-3">
-                              <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${s.enrolled ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
-                                {s.enrolled ? '✅ Enrolled' : '❌ Not enrolled'}
+                              <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${s.face_enrolled ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+                                {s.face_enrolled ? '✅ Enrolled' : '❌ Not enrolled'}
                               </span>
                             </td>
                           </tr>
@@ -340,6 +352,76 @@ function AdminUsersPage() {
             </div>
           )}
         </>
+      )}
+
+      {/* System Settings Tab */}
+      {tab === 'settings' && sysSettings && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 max-w-lg space-y-5">
+          <h2 className="text-lg font-bold text-gray-900">System Settings</h2>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Face Recognition Threshold: <span className="text-purple-600 font-bold">{sysSettings.recognition_threshold}</span>
+            </label>
+            <input type="range" min="0.5" max="1.0" step="0.01"
+              value={sysSettings.recognition_threshold}
+              onChange={e => setSysSettings((s: any) => ({ ...s, recognition_threshold: parseFloat(e.target.value) }))}
+              className="w-full accent-purple-600"
+            />
+            <p className="text-xs text-gray-400 mt-1">Higher = stricter matching. Recommended: 0.85–0.95</p>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Duplicate Window (minutes): <span className="text-purple-600 font-bold">{sysSettings.duplicate_window_minutes}</span></label>
+            <input type="number" min="1" max="120"
+              value={sysSettings.duplicate_window_minutes}
+              onChange={e => setSysSettings((s: any) => ({ ...s, duplicate_window_minutes: parseInt(e.target.value) }))}
+              className="border border-gray-200 rounded-xl px-4 py-2 text-sm w-32 focus:outline-none focus:border-purple-500"
+            />
+            <p className="text-xs text-gray-400 mt-1">Prevents the same student being marked twice within this window</p>
+          </div>
+          <button
+            disabled={savingSettings}
+            onClick={async () => {
+              setSavingSettings(true);
+              await fetch(`${API}/api/v1/admin/system-settings`, { method: 'PUT', headers: { 'Content-Type': 'application/json', ...auth().headers }, body: JSON.stringify(sysSettings) });
+              setSavingSettings(false);
+              setSuccess('Settings saved');
+              setTimeout(() => setSuccess(''), 3000);
+            }}
+            className="px-6 py-2.5 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-xl text-sm font-semibold hover:opacity-90 disabled:opacity-50 transition"
+          >
+            {savingSettings ? 'Saving...' : 'Save Settings'}
+          </button>
+        </div>
+      )}
+
+      {/* Audit Log Tab */}
+      {tab === 'audit' && (
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100">
+            <h2 className="text-lg font-bold text-gray-900">Audit Log</h2>
+            <p className="text-sm text-gray-400">Last 50 actions</p>
+          </div>
+          {auditLogs.length === 0 ? (
+            <p className="text-gray-400 text-sm p-6">No audit logs yet.</p>
+          ) : (
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-100">
+                <tr>{['Time', 'Actor', 'Action', 'Target', 'Detail'].map(h => <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">{h}</th>)}</tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {auditLogs.map((l: any) => (
+                  <tr key={l.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">{new Date(l.timestamp).toLocaleString()}</td>
+                    <td className="px-4 py-3 text-gray-700 text-xs">{l.actor}</td>
+                    <td className="px-4 py-3"><span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full text-xs font-medium">{l.action}</span></td>
+                    <td className="px-4 py-3 text-gray-600 text-xs">{l.target_type} {l.target_id}</td>
+                    <td className="px-4 py-3 text-gray-400 text-xs font-mono">{JSON.stringify(l.detail)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       )}
 
       {/* Camera assignment modal */}

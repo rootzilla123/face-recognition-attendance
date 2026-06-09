@@ -1,0 +1,27 @@
+Now I have the full picture. Here's the honest breakdown of what's left:
+
+Critical (will crash at runtime):
+
+marks.py publish_mark calls NotificationService.send_in_app() and NotificationService.send_sms() as static methods — neither exists. Publishing a mark will throw a 500 error right now.
+Missing database migrations (tables that exist in code but not in the DB):
+
+student_marks table — no migration, so marks/grades won't save
+grading_schemes table — same
+teacher_subjects table — same
+Unfinished features (backend exists, no mobile UI):
+
+Audit logs viewer — backend records everything but no screen to view it
+Admin system settings screen
+Weekly trend / late arrivals reports
+Bulk mark CSV upload UI
+Subject analytics screen
+Consolidated term report screen
+Parent fees screen (backend exists, no mobile screen)
+Manual attendance UI (backend exists, no mobile button)
+Minor gaps:
+
+attendance.py date range endpoint returns a paginated dict but the response model says List[dict] — works but messy
+No phone number format validation before sending SMS (could fail silently with bad numbers)
+Notification records accumulate forever — no cleanup job
+Want me to start fixing these? The most impactful ones to tackle first would be the missing migrations (marks won't work at all without them) and the send_in_app crash in publish_mark.
+

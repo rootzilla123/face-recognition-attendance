@@ -4,12 +4,14 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { api } from '@/lib/api';
+import Logo from './Logo';
 
 const NAV_BY_ROLE: Record<string, { name: string; path: string; icon: string; description: string }[]> = {
   admin: [
     { name: 'Dashboard', path: '/dashboard', icon: '📊', description: 'Overview & Stats' },
     { name: 'Live Cameras', path: '/cameras', icon: '📹', description: 'Monitor Feeds' },
     { name: 'Students', path: '/students', icon: '👥', description: 'Manage Students' },
+    { name: 'Marks', path: '/marks', icon: '📝', description: 'Examination Marks' },
     { name: 'Announcements', path: '/announcements', icon: '📢', description: 'Post Announcements' },
     { name: 'Reports', path: '/reports', icon: '📄', description: 'Attendance Reports' },
     { name: 'Settings', path: '/settings', icon: '⚙️', description: 'Configuration' },
@@ -19,18 +21,20 @@ const NAV_BY_ROLE: Record<string, { name: string; path: string; icon: string; de
     { name: 'Dashboard', path: '/dashboard', icon: '📊', description: 'Overview & Stats' },
     { name: 'Live Cameras', path: '/cameras', icon: '📹', description: 'Monitor Feeds' },
     { name: 'Students', path: '/students', icon: '👥', description: 'View Students' },
+    { name: 'Marks', path: '/marks', icon: '📝', description: 'Record Marks' },
     { name: 'Announcements', path: '/announcements', icon: '📢', description: 'Post Announcements' },
     { name: 'Reports', path: '/reports', icon: '📄', description: 'Attendance Reports' },
     { name: 'My Profile', path: '/teacher-profile', icon: '👤', description: 'My Profile & Class' },
   ],
   student: [
     { name: 'My Dashboard', path: '/dashboard', icon: '📊', description: 'My Attendance' },
+    { name: 'My Marks', path: '/my-marks', icon: '📝', description: 'Examination Results' },
     { name: 'Announcements', path: '/announcements', icon: '📢', description: 'School News' },
     { name: 'My Profile', path: '/profile', icon: '👤', description: 'My Profile' },
   ],
   parent: [
     { name: 'Dashboard', path: '/dashboard', icon: '📊', description: 'Children Overview' },
-    { name: 'My Children', path: '/children', icon: '👨‍👧', description: 'Attendance Records' },
+    { name: 'My Children', path: '/children', icon: '👨‍👧', description: 'Attendance & Marks' },
     { name: 'Announcements', path: '/announcements', icon: '📢', description: 'School News' },
     { name: 'Notifications', path: '/notifications', icon: '🔔', description: 'My Alerts' },
     { name: 'Preferences', path: '/preferences', icon: '⚙️', description: 'Notification Settings' },
@@ -69,14 +73,20 @@ export default function Sidebar() {
     return () => clearInterval(iv);
   }, [user, role]);
 
-
   // Real-time notification updates via WebSocket
   useEffect(() => {
     if (!user) return;
     let ws: WebSocket | null = null;
+    let reconnectTimer: NodeJS.Timeout | null = null;
+    let disposed = false;
+
+    const apiBase = process.env.NEXT_PUBLIC_API_URL ?? `http://${typeof window !== 'undefined' ? window.location.hostname : 'localhost'}:8001`;
+    const wsBase = apiBase.replace('https://', 'wss://').replace('http://', 'ws://');
+
     const connect = () => {
+      if (disposed) return;
       try {
-        ws = new WebSocket(`ws://${typeof window !== 'undefined' ? window.location.hostname : 'localhost'}:8001/ws/attendance`);
+        ws = new WebSocket(`${wsBase}/ws/attendance`);
         ws.onmessage = (e) => {
           try {
             const msg = JSON.parse(e.data);
@@ -85,11 +95,17 @@ export default function Sidebar() {
             }
           } catch {}
         };
-        ws.onclose = () => setTimeout(connect, 5000);
+        ws.onclose = () => {
+          if (!disposed) reconnectTimer = setTimeout(connect, 5000);
+        };
       } catch {}
     };
     connect();
-    return () => { ws?.close(); };
+    return () => {
+      disposed = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      ws?.close();
+    };
   }, [user]);
 
   // Close drawer on route change
@@ -100,13 +116,7 @@ export default function Sidebar() {
       {/* Logo */}
       <div className="p-6 border-b border-gray-700 flex items-center justify-between">
         <Link href="/dashboard" className="flex items-center space-x-3 group">
-          <div className={`w-10 h-10 bg-gradient-to-br ${color} rounded-xl flex items-center justify-center shadow-lg`}>
-            <span className="text-lg">📸</span>
-          </div>
-          <div>
-            <h1 className="text-lg font-bold text-white">AttendanceAI</h1>
-            <p className="text-xs text-gray-400 capitalize">{role} Portal</p>
-          </div>
+          <Logo size="sm" />
         </Link>
         {/* Close button - mobile only */}
         <button onClick={() => setOpen(false)} className="lg:hidden text-gray-400 hover:text-white text-xl p-1">✕</button>
@@ -182,10 +192,8 @@ export default function Sidebar() {
       {/* Mobile top bar */}
       <div className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-gray-950 border-b border-gray-700 flex items-center justify-between px-4 py-3">
         <div className="flex items-center gap-2">
-          <div className={`w-8 h-8 bg-gradient-to-br ${color} rounded-lg flex items-center justify-center`}>
-            <span className="text-sm">📸</span>
-          </div>
-          <span className="text-white font-bold text-sm">AttendanceAI</span>
+          <Logo size="sm" showText={false} />
+          <span className="text-white font-bold text-sm tracking-tight">SHADOMFACEPRO</span>
         </div>
         <button onClick={() => setOpen(true)}
           className="text-gray-300 hover:text-white p-2 rounded-lg hover:bg-gray-700 transition">

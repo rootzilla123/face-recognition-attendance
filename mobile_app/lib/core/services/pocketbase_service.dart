@@ -2,7 +2,9 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../utils/server_config.dart';
+import '../api/endpoints.dart';
 
 /// Handles all PocketBase auth operations
 class PocketBaseService {
@@ -35,8 +37,10 @@ class PocketBaseService {
     if (_token != null) {
       try {
         await refreshAuth();
-      } catch (_) {
-        await logout();
+      } on Exception catch (e) {
+        // If it's a session-expired error, logout() was already called inside refreshAuth.
+        // For network errors, keep the session so the user can still use cached data.
+        if (e.toString().contains('Session expired')) rethrow;
       }
     }
   }
@@ -96,38 +100,74 @@ class PocketBaseService {
     );
   }
 
+  /// Returns { 'record': {...}, 'googleName': '...' }
   static Future<Map<String, dynamic>> signInWithGoogle({String defaultRole = 'student'}) async {
-    final googleSignIn = GoogleSignIn(scopes: ['email', 'profile']);
+    final googleSignIn = GoogleSignIn();
     final googleUser = await googleSignIn.signIn();
     if (googleUser == null) throw Exception('Google sign-in cancelled');
 
-    final googleAuth = await googleUser.authentication;
-    final idToken = googleAuth.idToken;
-    if (idToken == null) throw Exception('Failed to get Google ID token');
+    final googleName = googleUser.displayName ?? googleUser.email.split('@').first;
 
-    // Exchange Google token with PocketBase
+    final googleAuth = await googleUser.authentication;
+    final credential = GoogleAuthProvider.credential(
+      accessToken: googleAuth.accessToken,
+      idToken: googleAuth.idToken,
+    );
+
+    final userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
+    final firebaseUser = userCredential.user;
+    if (firebaseUser == null) throw Exception('Firebase sign-in failed');
+
+    final firebaseToken = await firebaseUser.getIdToken();
+
     final res = await http.post(
-      Uri.parse('$_pbUrl/api/collections/users/auth-with-oauth2'),
+      Uri.parse('${Endpoints.apiV1}/auth/google'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({
-        'provider': 'google',
-        'code': idToken,
-        'codeVerifier': '',
-        'redirectUrl': '',
-        'createData': {'role': defaultRole, 'emailVisibility': true},
-      }),
+      body: jsonEncode({'firebase_token': firebaseToken, 'default_role': defaultRole}),
     );
 
     if (res.statusCode != 200) {
       final body = jsonDecode(res.body);
-      throw Exception(body['message'] ?? 'Google sign-in failed');
+      throw Exception(body['detail'] ?? body['message'] ?? 'Google sign-in failed');
     }
 
     final data = jsonDecode(res.body);
     _token = data['token'];
     _user = data['record'];
     await _saveSession();
-    return data['record'];
+    return {'record': data['record'], 'googleName': googleName};
+  }
+
+  static Future<Map<String, dynamic>> exchangeFirebaseToken({
+    required String firebaseToken,
+    required String role,
+    required String displayName,
+  }) async {
+    final res = await http.post(
+      Uri.parse('${Endpoints.apiV1}/auth/google'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({
+        'firebase_token': firebaseToken,
+        'default_role': role,
+        'display_name': displayName,
+      }),
+    );
+
+    if (res.statusCode != 200) {
+      final body = jsonDecode(res.body);
+      throw Exception(body['detail'] ?? body['message'] ?? 'Google sign-in failed');
+    }
+
+    final data = jsonDecode(res.body);
+    
+    // session is only saved if we got a token (ie. not a 'detect' call for new user)
+    if (data['token'] != null) {
+      _token = data['token'];
+      _user = data['record'];
+      await _saveSession();
+    }
+    
+    return data;
   }
 
   static Future<void> requestPasswordReset(String email) async {    final res = await http.post(
@@ -142,17 +182,24 @@ class PocketBaseService {
 
   static Future<void> refreshAuth() async {
     if (_token == null) return;
-    final res = await http.post(
-      Uri.parse('$_pbUrl/api/collections/users/auth-refresh'),
-      headers: {'Authorization': _token!},
-    );
-    if (res.statusCode == 200) {
-      final data = jsonDecode(res.body);
-      _token = data['token'];
-      _user = data['record'];
-      await _saveSession();
-    } else {
-      throw Exception('Session expired');
+    try {
+      final res = await http.post(
+        Uri.parse('$_pbUrl/api/collections/users/auth-refresh'),
+        headers: {'Authorization': _token!},
+      ).timeout(const Duration(seconds: 10));
+      if (res.statusCode == 200) {
+        final data = jsonDecode(res.body);
+        _token = data['token'];
+        _user = data['record'];
+        await _saveSession();
+      } else if (res.statusCode == 401 || res.statusCode == 403) {
+        // Token is invalid — clear session so user is sent to login
+        await logout();
+        throw Exception('Session expired');
+      }
+      // Other errors (5xx, etc.) — keep existing session, don't force logout
+    } on Exception {
+      rethrow;
     }
   }
 
@@ -162,6 +209,10 @@ class PocketBaseService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_tokenKey);
     await prefs.remove(_userKey);
+    try {
+      await FirebaseAuth.instance.signOut();
+      await GoogleSignIn().signOut();
+    } catch (_) {}
   }
 
   static Future<void> _saveSession() async {

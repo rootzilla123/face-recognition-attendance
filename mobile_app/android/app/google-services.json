@@ -12,7 +12,20 @@
           "package_name": "com.skulicheck.facerecognition"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "223148362760-qd1dm8slhpe9kqgk144vbuias02261jn.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.skulicheck.facerecognition",
+            "certificate_hash": "658b8e4502008543f40eebd84f37493221fa642d"
+          }
+        },
+        {
+          "client_id": "223148362760-mvnofnpr509kcok9jec2pd65qqrvk9j7.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyC5RhSxE_nWUjyVn1ghmMMQOEcFE8Zzydo"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "223148362760-i8j44ojmljstk8ctaouj27emuoa3ghov.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }

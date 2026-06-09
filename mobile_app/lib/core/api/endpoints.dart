@@ -27,6 +27,20 @@ class Endpoints {
   static String get dailySummary => '/reports/daily-summary';
   static String studentReport(String id) => '/reports/student/$id';
   static String get resetPassword => '/auth/reset-password';
+  static String get registerTeacher => '/auth/register/teacher';
+  static String get registerAdmin => '/auth/register/admin';
+
+  // Marks
+  static const String marks = '/marks';
+  static String markById(String id) => '/marks/$id';
+  static String markPublish(String id) => '/marks/$id/publish';
+  static String marksBulk(String term) => '/marks/bulk?term=${Uri.encodeComponent(term)}';
+  static String marksAnalytics(String subject, String term) =>
+      '/marks/analytics/subject?subject=${Uri.encodeComponent(subject)}&term=${Uri.encodeComponent(term)}';
+  static String marksConsolidated(String studentId, String term) =>
+      '/marks/consolidated/$studentId?term=${Uri.encodeComponent(term)}';
+  static const String myMarks = '/my-marks';
+  static String childMarks(String studentId) => '/child-marks/$studentId';
 
   // WebSocket — handles both http→ws and https→wss
   static String get wsUrl {
@@ -39,4 +53,8 @@ class Endpoints {
   // MJPEG stream
   static String mjpegStream(int cameraId) =>
       '$apiV1/cameras/$cameraId/stream';
+
+  // Video clip for an attendance record
+  static String attendanceClip(String attendanceId) =>
+      '$apiV1/attendance/$attendanceId/clip';
 }

@@ -1,17 +1,24 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 import '../core/api/endpoints.dart';
+import '../core/models/attendance.dart';
 import '../core/services/notification_service.dart';
+import 'attendance_provider.dart';
 
 class WebSocketProvider extends ChangeNotifier {
   WebSocketChannel? _channel;
   bool isConnected = false;
   List<Map<String, dynamic>> recentDetections = [];
   Map<String, List<Map<String, dynamic>>> cameraDetections = {};
+  Map<String, String> cameraStatuses = {}; // cameraId → 'online'|'offline'
   StreamSubscription? _sub;
   bool _disposed = false;
+  BuildContext? _context;
+
+  void setContext(BuildContext context) => _context = context;
 
   void connect() {
     if (_disposed) return;
@@ -47,6 +54,18 @@ class WebSocketProvider extends ChangeNotifier {
                   });
                   if (recentDetections.length > 20) recentDetections.removeLast();
                   NotificationService.showAttendance(studentId, cameraId, conf);
+                  // Push live record into AttendanceProvider
+                  if (_context != null) {
+                    try {
+                      _context!.read<AttendanceProvider>().injectLiveRecord(AttendanceRecord(
+                        id: 'ws_${DateTime.now().millisecondsSinceEpoch}',
+                        studentId: studentId,
+                        cameraLocation: cameraId,
+                        timestamp: DateTime.now(),
+                        confidenceScore: conf,
+                      ));
+                    } catch (_) {}
+                  }
                 }
               }
               notifyListeners();
@@ -58,6 +77,15 @@ class WebSocketProvider extends ChangeNotifier {
               final location = json['camera_location']?.toString() ?? '';
               final confidence = (json['confidence'] as num?)?.toDouble() ?? 0.0;
               NotificationService.showAttendance(studentId, location, confidence);
+            } else if (type == 'camera_status') {
+              final cameraId = json['camera_id']?.toString() ?? '';
+              final status = json['status']?.toString() ?? 'offline';
+              final cameraName = json['camera_name']?.toString() ?? 'Camera';
+              cameraStatuses[cameraId] = status;
+              notifyListeners();
+              if (status == 'offline') {
+                NotificationService.showCameraOffline(cameraName);
+              }
             }
           } catch (_) {}
         },

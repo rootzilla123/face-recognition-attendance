@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/utils/app_theme.dart';
 
 class StatsCard extends StatelessWidget {
@@ -7,6 +8,7 @@ class StatsCard extends StatelessWidget {
   final String icon;
   final CardColor colorType;
   final String? subtitle;
+  final int index; // For staggered animations
 
   const StatsCard({
     super.key,
@@ -15,17 +17,18 @@ class StatsCard extends StatelessWidget {
     required this.icon,
     required this.colorType,
     this.subtitle,
+    this.index = 0,
   });
 
-  const StatsCard.blue({super.key, required this.label, required this.value, required this.icon, this.subtitle})
+  const StatsCard.blue({super.key, required this.label, required this.value, required this.icon, this.subtitle, this.index = 0})
       : colorType = CardColor.blue;
-  const StatsCard.green({super.key, required this.label, required this.value, required this.icon, this.subtitle})
+  const StatsCard.green({super.key, required this.label, required this.value, required this.icon, this.subtitle, this.index = 0})
       : colorType = CardColor.green;
-  const StatsCard.purple({super.key, required this.label, required this.value, required this.icon, this.subtitle})
+  const StatsCard.purple({super.key, required this.label, required this.value, required this.icon, this.subtitle, this.index = 0})
       : colorType = CardColor.purple;
-  const StatsCard.orange({super.key, required this.label, required this.value, required this.icon, this.subtitle})
+  const StatsCard.orange({super.key, required this.label, required this.value, required this.icon, this.subtitle, this.index = 0})
       : colorType = CardColor.orange;
-  const StatsCard.red({super.key, required this.label, required this.value, required this.icon, this.subtitle})
+  const StatsCard.red({super.key, required this.label, required this.value, required this.icon, this.subtitle, this.index = 0})
       : colorType = CardColor.red;
 
   @override
@@ -34,44 +37,72 @@ class StatsCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [scheme.bgStart, scheme.bgEnd],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.5)),
-        boxShadow: [
-          BoxShadow(color: scheme.shadow.withValues(alpha: 0.3), blurRadius: 12, offset: const Offset(0, 4)),
-        ],
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: AppColors.premiumShadow,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
+      child: Stack(
         children: [
-          Container(
-            width: 34,
-            height: 34,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(colors: scheme.iconGradient),
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: [BoxShadow(color: scheme.shadow.withValues(alpha: 0.4), blurRadius: 8, offset: const Offset(0, 2))],
+          // Background accent
+          Positioned(
+            top: -20,
+            right: -20,
+            child: Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                color: scheme.shadow.withOpacity(0.05),
+                shape: BoxShape.circle,
+              ),
             ),
-            child: Center(child: Text(icon, style: const TextStyle(fontSize: 16))),
           ),
-          const SizedBox(height: 8),
-          Text(label, style: const TextStyle(fontSize: 11, color: AppColors.gray700, fontWeight: FontWeight.w500)),
-          const SizedBox(height: 2),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            alignment: Alignment.centerLeft,
-            child: Text(value, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.gray900)),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(colors: scheme.iconGradient),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(color: scheme.shadow.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4))
+                      ],
+                    ),
+                    child: Center(child: Text(icon, style: const TextStyle(fontSize: 18))),
+                  ),
+                  Icon(Icons.more_horiz, color: AppColors.gray300, size: 18),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label, 
+                    style: const TextStyle(fontSize: 11, color: AppColors.gray500, fontWeight: FontWeight.w600, letterSpacing: 0.2)),
+                  const SizedBox(height: 2),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(value, 
+                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: AppColors.gray900, letterSpacing: -0.5)),
+                  ),
+                  if (subtitle != null)
+                    Text(subtitle!, 
+                      style: TextStyle(fontSize: 10, color: scheme.textColor, fontWeight: FontWeight.w700), overflow: TextOverflow.ellipsis),
+                ],
+              ),
+            ],
           ),
-          if (subtitle != null)
-            Text(subtitle!, style: TextStyle(fontSize: 10, color: scheme.textColor, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis),
         ],
       ),
-    );
+    ).animate()
+     .fadeIn(delay: (100 * index).ms, duration: 400.ms)
+     .slideY(begin: 0.1, delay: (100 * index).ms, duration: 400.ms, curve: Curves.easeOutQuad);
   }
 
   _ColorScheme _scheme(CardColor c) {

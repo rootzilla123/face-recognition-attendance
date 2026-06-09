@@ -1,0 +1,97 @@
+# Kubernetes CronJob for automated backups
+# Runs daily at 2 AM
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backup-script
+  namespace: production
+data:
+  backup.sh: |
+    #!/bin/bash
+    set -euo pipefail
+    
+    TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+    BACKUP_DIR="/backups/$TIMESTAMP"
+    mkdir -p "$BACKUP_DIR"
+    
+    echo "Starting backup: $TIMESTAMP"
+    
+    # Backup main database
+    pg_dump -h postgres -U postgres attendance_db | gzip > "$BACKUP_DIR/postgres.sql.gz"
+    
+    # Backup CompreFace database
+    pg_dump -h compreface-postgres-db -U postgres frs | gzip > "$BACKUP_DIR/compreface.sql.gz"
+    
+    # Create manifest
+    cat > "$BACKUP_DIR/manifest.json" <<EOF
+    {
+      "timestamp": "$TIMESTAMP",
+      "date": "$(date -Iseconds)",
+      "postgres_size": "$(du -h "$BACKUP_DIR/postgres.sql.gz" | cut -f1)",
+      "compreface_size": "$(du -h "$BACKUP_DIR/compreface.sql.gz" | cut -f1)"
+    }
+    EOF
+    
+    # Cleanup old backups (keep last 30 days)
+    find /backups -maxdepth 1 -type d -name "20*" -mtime +30 -exec rm -rf {} \;
+    
+    echo "Backup complete: $BACKUP_DIR"
+    ls -lh "$BACKUP_DIR"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: backup-storage
+  namespace: production
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi  # Adjust based on your needs
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: database-backup
+  namespace: production
+spec:
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  successfulJobsHistoryLimit: 7
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+          - name: backup
+            image: postgres:15-alpine
+            command: ["/bin/bash", "/scripts/backup.sh"]
+            env:
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secrets
+                  key: POSTGRES_PASSWORD
+            volumeMounts:
+            - name: backup-storage
+              mountPath: /backups
+            - name: backup-script
+              mountPath: /scripts
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "200m"
+              limits:
+                memory: "1Gi"
+                cpu: "1000m"
+          volumes:
+          - name: backup-storage
+            persistentVolumeClaim:
+              claimName: backup-storage
+          - name: backup-script
+            configMap:
+              name: backup-script
+              defaultMode: 0755

@@ -24,12 +24,12 @@ class Camera {
   });
 
   factory Camera.fromJson(Map<String, dynamic> j) => Camera(
-        id: j['id'],
-        name: j['name'],
-        location: j['location'],
-        streamUrl: j['stream_url'],
-        protocol: j['protocol'],
-        status: j['status'] ?? 'offline',
+        id: j['id'] is int ? j['id'] : int.tryParse(j['id'].toString()) ?? 0,
+        name: j['name']?.toString() ?? '',
+        location: j['location']?.toString() ?? '',
+        streamUrl: j['stream_url']?.toString() ?? '',
+        protocol: j['protocol']?.toString() ?? 'http',
+        status: j['status']?.toString() ?? 'offline',
         isActive: j['is_active'] ?? false,
         frameRate: j['frame_rate'] ?? 5,
         lastSeen: j['last_seen'] != null ? DateTime.parse(j['last_seen']) : null,

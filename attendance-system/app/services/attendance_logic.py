@@ -7,7 +7,27 @@ import redis
 class AttendanceService:
     def __init__(self, db: Session):
         self.db = db
-        self.redis_client = redis.from_url(settings.redis_url)
+        self._redis = None
+        try:
+            self._redis = redis.from_url(settings.redis_url, socket_connect_timeout=2)
+            self._redis.ping()
+        except Exception:
+            import logging
+            logging.getLogger(__name__).warning("Redis unavailable — duplicate detection disabled")
+            self._redis = None
+
+    def _redis_exists(self, key: str) -> bool:
+        try:
+            return bool(self._redis and self._redis.exists(key))
+        except Exception:
+            return False
+
+    def _redis_setex(self, key: str, ttl: int, value: str):
+        try:
+            if self._redis:
+                self._redis.setex(key, ttl, value)
+        except Exception:
+            pass
     
     def mark_attendance(
         self,
@@ -27,7 +47,7 @@ class AttendanceService:
         
         # Check for duplicate in Redis
         cache_key = f"attendance:recent:{student.id}:{camera_location}"
-        if self.redis_client.exists(cache_key):
+        if self._redis_exists(cache_key):
             return None  # Duplicate within time window
         
         # Create attendance record
@@ -44,7 +64,7 @@ class AttendanceService:
         
         # Cache in Redis with TTL
         ttl = settings.duplicate_window_minutes * 60
-        self.redis_client.setex(cache_key, ttl, str(record.id))
+        self._redis_setex(cache_key, ttl, str(record.id))
         
         return record
     

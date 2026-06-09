@@ -6,12 +6,79 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 from pydantic import BaseModel
-from app.database import get_db
+from app.database import get_db, SessionLocal
 from app.models import Camera, Teacher, TeacherCamera, User, UserRole
 from app.dependencies import require_admin, require_teacher_or_admin, get_current_user
 from datetime import datetime
+import asyncio
+import httpx
+import logging
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
+
+# ── Camera health monitor ─────────────────────────────────────────────────────
+
+async def _check_camera_reachable(stream_url: str, protocol: str) -> bool:
+    try:
+        if protocol in ("http", "mjpeg"):
+            async with httpx.AsyncClient(timeout=4.0) as client:
+                r = await client.head(stream_url)
+                return r.status_code < 500
+        else:
+            import urllib.parse
+            parsed = urllib.parse.urlparse(stream_url)
+            host = parsed.hostname or "localhost"
+            port = parsed.port or 554
+            _, writer = await asyncio.wait_for(
+                asyncio.open_connection(host, port), timeout=3
+            )
+            writer.close()
+            return True
+    except Exception:
+        return False
+
+
+async def camera_health_loop(websocket_manager=None):
+    """Background task: check all active cameras every 30s, update DB + broadcast."""
+    while True:
+        await asyncio.sleep(30)
+        db = SessionLocal()
+        try:
+            cameras = db.query(Camera).filter(Camera.is_active == True).all()
+            for cam in cameras:
+                reachable = await _check_camera_reachable(cam.stream_url, cam.protocol)
+                new_status = "online" if reachable else "offline"
+                if cam.status != new_status:
+                    cam.status = new_status
+                    cam.last_seen = datetime.utcnow() if reachable else cam.last_seen
+                    cam.error_message = None if reachable else "Camera unreachable"
+                    logger.warning(f"Camera {cam.name} ({cam.id}) is now {new_status}")
+                    if websocket_manager:
+                        await websocket_manager.broadcast({
+                            "type": "camera_status",
+                            "camera_id": cam.id,
+                            "camera_name": cam.name,
+                            "status": new_status,
+                            "timestamp": datetime.utcnow().isoformat(),
+                        })
+            db.commit()
+        except Exception as e:
+            logger.error(f"Camera health check error: {e}")
+        finally:
+            db.close()
+
+
+@router.get("/cameras/health")
+async def cameras_health(db: Session = Depends(get_db), _=Depends(require_teacher_or_admin)):
+    cameras = db.query(Camera).filter(Camera.is_active == True).all()
+    offline = [c for c in cameras if c.status != "online"]
+    return {
+        "total": len(cameras),
+        "online": len(cameras) - len(offline),
+        "offline": len(offline),
+        "offline_cameras": [{"id": c.id, "name": c.name, "location": c.location, "last_seen": c.last_seen} for c in offline],
+    }
 
 
 # Pydantic schemas for request/response
@@ -250,7 +317,7 @@ async def delete_camera(camera_id: int, db: Session = Depends(get_db), _=Depends
 
 
 @router.post("/cameras/{camera_id}/start")
-async def start_camera(camera_id: int, db: Session = Depends(get_db)):
+async def start_camera(camera_id: int, db: Session = Depends(get_db), _=Depends(require_admin)):
     """
     Start a camera stream.
     
@@ -289,7 +356,7 @@ async def start_camera(camera_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/cameras/{camera_id}/stop")
-async def stop_camera(camera_id: int, db: Session = Depends(get_db)):
+async def stop_camera(camera_id: int, db: Session = Depends(get_db), _=Depends(require_admin)):
     """
     Stop a camera stream.
     

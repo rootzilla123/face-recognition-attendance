@@ -68,31 +68,17 @@ class MJPEGStreamService:
         logger.info(f"MJPEGStreamService initialized with JPEG quality {jpeg_quality}")
     
     async def validate_camera(self, camera_id: str) -> Camera:
-        """
-        Validate that camera exists and is active.
-        
-        Args:
-            camera_id: Camera identifier
-            
-        Returns:
-            Camera: Camera database model
-            
-        Raises:
-            CameraNotFoundError: If camera doesn't exist
-            CameraInactiveError: If camera is not active
-        """
-        # Query database for camera by ID
-        camera = self.db.query(Camera).filter(Camera.id == int(camera_id)).first()
-        
-        if not camera:
-            logger.warning(f"Camera not found: {camera_id}")
-            raise CameraNotFoundError(f"Camera {camera_id} not found")
-        
-        if not camera.is_active:
-            logger.warning(f"Camera not active: {camera_id}")
-            raise CameraInactiveError(f"Camera {camera_id} is not active")
-        
-        return camera
+        from app.database import SessionLocal
+        db = SessionLocal()
+        try:
+            camera = db.query(Camera).filter(Camera.id == int(camera_id)).first()
+            if not camera:
+                raise CameraNotFoundError(f"Camera {camera_id} not found")
+            if not camera.is_active:
+                raise CameraInactiveError(f"Camera {camera_id} is not active")
+            return camera
+        finally:
+            db.close()
     
     def register_client(self, camera_id: str, client_id: str) -> None:
         """
@@ -146,24 +132,15 @@ class MJPEGStreamService:
         return len(self.active_streams[camera_id])
     
     async def get_frame_interval(self, camera_id: str) -> float:
-        """
-        Get frame interval for a camera based on configured frame rate.
-        
-        Args:
-            camera_id: Camera identifier
-            
-        Returns:
-            float: Seconds between frames (1.0 / frame_rate)
-        """
-        # Read Frame_Rate from Camera database record
-        camera = self.db.query(Camera).filter(Camera.id == int(camera_id)).first()
-        
-        if not camera or not camera.frame_rate:
-            # Default to 5 FPS if not configured
-            return 1.0 / 5.0
-        
-        # Calculate interval as 1.0 / Frame_Rate
-        return 1.0 / float(camera.frame_rate)
+        from app.database import SessionLocal
+        db = SessionLocal()
+        try:
+            camera = db.query(Camera).filter(Camera.id == int(camera_id)).first()
+            if not camera or not camera.frame_rate:
+                return 1.0 / 5.0
+            return 1.0 / float(camera.frame_rate)
+        finally:
+            db.close()
     
     async def generate_mjpeg_stream(
         self,

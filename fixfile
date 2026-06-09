@@ -1,0 +1,39 @@
+> Honest assessment — here's what's broken/missing before this is investor-ready:
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+🔴 Critical (blocks demo)
+
+1. Student photos don't load — auth headers missing (just fixed, needs rebuild)
+2. No real-time attendance feed — WebSocket connects but the UI doesn't react live when a face is recognized
+3. CompreFace is single-instance — one camera freeze kills recognition for all students
+4. No attendance confirmation UI — when a student is detected, there's no visual confirmation on the teacher's 
+screen
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+🟠 High Priority (investors will ask)
+
+5. No multi-school/multi-tenant support — everything is one flat database, can't onboard School B without 
+breaking School A
+6. No dashboard analytics — investors want to see graphs: attendance trends, late arrivals, absent streaks, 
+class-level stats
+7. Manual attendance fallback is broken — the endpoint exists but the UI doesn't work properly
+8. Parent notifications don't actually send — Twilio credentials are placeholder, email (Resend) needs 
+verification
+9. No student enrollment flow on mobile — teachers can add students but the face registration UX is rough
+10. Reports are basic — no exportable PDF/Excel, no per-class breakdown
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+🟡 Scale/Production gaps
+
+11. PostgreSQL has no connection pooling — will choke at ~50 concurrent users
+12. No camera health monitoring — if a camera goes offline, nobody knows
+13. Face recognition threshold hardcoded — no per-school tuning
+14. No audit logs — who marked who present, when, from which camera
+15. APK hardcoded to local IP — needs a settings screen with the school's server URL
+

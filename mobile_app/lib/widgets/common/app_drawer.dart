@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../core/utils/app_theme.dart';
 import '../../providers/attendance_provider.dart';
 import '../../providers/auth_provider.dart';
+import '../common/app_logo.dart';
 
 class AppDrawer extends StatelessWidget {
   final int currentIndex;
@@ -19,118 +21,132 @@ class AppDrawer extends StatelessWidget {
     final present = stats?.presentStudents ?? 0;
     final total = stats?.totalStudents ?? 0;
 
-    // Build nav items matching shell exactly
     final items = _buildItems(auth);
 
     return Drawer(
-      width: 280,
+      width: 300,
       backgroundColor: AppColors.sidebarDark,
       child: Column(children: [
-        // Logo
+        // Logo & Brand
         Container(
-          padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 16, left: 20, right: 20, bottom: 20),
-          decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.gray700))),
-          child: Row(children: [
-            Container(
-              width: 48, height: 48,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: [AppColors.primary500, AppColors.secondary600]),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: const Center(child: Text('📸', style: TextStyle(fontSize: 22))),
-            ),
-            const SizedBox(width: 12),
-            const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('AttendanceAI', style: TextStyle(color: Colors.white, fontSize: 17, fontWeight: FontWeight.bold)),
-              Text('Face Recognition System', style: TextStyle(color: AppColors.gray400, fontSize: 11)),
-            ]),
-          ]),
+          padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 24, left: 24, right: 24, bottom: 32),
+          child: const AppLogo(size: 40),
         ),
 
         // Nav items
         Expanded(
           child: ListView.builder(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.symmetric(horizontal: 16),
             itemCount: items.length,
             itemBuilder: (ctx, i) {
               final item = items[i];
               final active = currentIndex == i;
-              return GestureDetector(
-                onTap: () => onSelect(i),
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 200),
-                  margin: const EdgeInsets.only(bottom: 4),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    gradient: active ? const LinearGradient(colors: [AppColors.primary700, AppColors.secondary600]) : null,
-                    borderRadius: BorderRadius.circular(12),
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: InkWell(
+                  onTap: () {
+                    Navigator.pop(context);
+                    onSelect(i);
+                  },
+                  borderRadius: BorderRadius.circular(16),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 300),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: active ? Colors.white.withOpacity(0.08) : Colors.transparent,
+                      borderRadius: BorderRadius.circular(16),
+                      border: active ? Border.all(color: Colors.white.withOpacity(0.1)) : null,
+                    ),
+                    child: Row(children: [
+                      Text(item.icon, style: const TextStyle(fontSize: 20)),
+                      const SizedBox(width: 16),
+                      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text(item.name, 
+                          style: TextStyle(
+                            color: active ? Colors.white : AppColors.gray400, 
+                            fontSize: 14, 
+                            fontWeight: active ? FontWeight.bold : FontWeight.w500
+                          )
+                        ),
+                        Text(item.desc, style: TextStyle(color: active ? AppColors.primary300 : AppColors.gray600, fontSize: 11)),
+                      ])),
+                      if (active) 
+                        Container(
+                          width: 6, height: 6, 
+                          decoration: const BoxDecoration(color: AppColors.primary500, shape: BoxShape.circle)
+                        ).animate().scale(duration: 400.ms),
+                    ]),
                   ),
-                  child: Row(children: [
-                    Text(item.icon, style: const TextStyle(fontSize: 20)),
-                    const SizedBox(width: 12),
-                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(item.name, style: TextStyle(color: active ? Colors.white : AppColors.gray200, fontSize: 13, fontWeight: FontWeight.w600)),
-                      Text(item.desc, style: TextStyle(color: active ? const Color(0xFFBFDBFE) : AppColors.gray400, fontSize: 11)),
-                    ])),
-                    if (active) Container(width: 4, height: 32, decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(4))),
-                  ]),
                 ),
-              );
+              ).animate().fadeIn(delay: (50 * i).ms).slideX(begin: -0.1);
             },
           ),
         ),
 
-        // Live stats (admin/teacher only)
+        // Status Card
         if (auth.isAdmin || auth.isTeacher)
           Container(
-            margin: const EdgeInsets.all(12),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.success500.withValues(alpha: 0.3)),
-            ),
+            margin: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(20),
+            decoration: AppColors.glass(opacity: 0.05, borderRadius: BorderRadius.circular(24)),
             child: Column(children: [
               Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                const Text("Today's Attendance", style: TextStyle(color: AppColors.gray200, fontSize: 12, fontWeight: FontWeight.w600)),
-                Row(children: [
-                  Container(width: 8, height: 8, decoration: const BoxDecoration(color: Color(0xFF4ADE80), shape: BoxShape.circle)),
-                  const SizedBox(width: 4),
-                  const Text('Live', style: TextStyle(color: Color(0xFF4ADE80), fontSize: 11)),
-                ]),
+                const Text("LIVE STATUS", style: TextStyle(color: AppColors.gray500, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 1)),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(color: const Color(0xFF4ADE80).withOpacity(0.1), borderRadius: BorderRadius.circular(8)),
+                  child: const Row(children: [
+                    Text('Active', style: TextStyle(color: Color(0xFF4ADE80), fontSize: 10, fontWeight: FontWeight.bold)),
+                  ]),
+                ),
               ]),
-              const SizedBox(height: 8),
-              Align(alignment: Alignment.centerLeft, child: Text('${pct.toStringAsFixed(0)}%', style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold))),
-              Text('$present of $total students present', style: const TextStyle(color: AppColors.gray300, fontSize: 12)),
-              const SizedBox(height: 8),
+              const SizedBox(height: 16),
+              Align(alignment: Alignment.centerLeft, child: Text('${pct.toStringAsFixed(0)}%', style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold, letterSpacing: -1))),
+              Text('$present / $total present', style: const TextStyle(color: AppColors.gray400, fontSize: 12, fontWeight: FontWeight.w500)),
+              const SizedBox(height: 12),
               ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: LinearProgressIndicator(value: pct / 100, backgroundColor: AppColors.gray700, valueColor: const AlwaysStoppedAnimation(AppColors.success500), minHeight: 6),
-              ),
+                borderRadius: BorderRadius.circular(10),
+                child: LinearProgressIndicator(
+                  value: pct / 100, 
+                  backgroundColor: Colors.white.withOpacity(0.05), 
+                  valueColor: const AlwaysStoppedAnimation(AppColors.primary500), 
+                  minHeight: 8
+                ),
+              ).animate().shimmer(delay: 1.seconds, duration: 2.seconds),
             ]),
           ),
 
-        // User profile
+        // User Profile
         Container(
-          padding: const EdgeInsets.all(12),
-          decoration: const BoxDecoration(border: Border(top: BorderSide(color: AppColors.gray700))),
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.2),
+            border: Border(top: BorderSide(color: Colors.white.withOpacity(0.05))),
+          ),
           child: Row(children: [
             Container(
-              width: 44, height: 44,
+              width: 48, height: 48,
               decoration: BoxDecoration(
                 gradient: const LinearGradient(colors: [AppColors.secondary500, Color(0xFFEC4899)]),
-                borderRadius: BorderRadius.circular(22),
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                   BoxShadow(color: AppColors.secondary500.withOpacity(0.3), blurRadius: 10, offset: const Offset(0, 4))
+                ]
               ),
               child: Center(child: Text(
                 user?.fullName.isNotEmpty == true ? user!.fullName[0].toUpperCase() : '?',
-                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
               )),
             ),
-            const SizedBox(width: 12),
+            const SizedBox(width: 16),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(user?.fullName ?? 'User', style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
-              Text(user?.role ?? '', style: const TextStyle(color: AppColors.gray400, fontSize: 11)),
+              Text(user?.fullName ?? 'User', style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold)),
+              Text(user?.role.toUpperCase() ?? '', style: const TextStyle(color: AppColors.gray500, fontSize: 10, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
             ])),
+            IconButton(
+              icon: const Icon(Icons.logout_rounded, color: AppColors.gray500, size: 20),
+              onPressed: () => auth.logout(),
+            ),
           ]),
         ),
         SizedBox(height: MediaQuery.of(context).padding.bottom),
@@ -140,29 +156,33 @@ class AppDrawer extends StatelessWidget {
 
   List<_NavItem> _buildItems(AuthProvider auth) {
     final items = <_NavItem>[
-      const _NavItem('Home', '🏠', 'Welcome'),
-      const _NavItem('Dashboard', '📊', 'Overview & Stats'),
+      const _NavItem('Home', '🏠', 'Activity Feed'),
+      const _NavItem('Dashboard', '📊', 'Analytics'),
     ];
     if (auth.isAdmin || auth.isTeacher) {
-      items.add(const _NavItem('Live Cameras', '📹', 'Monitor Feeds'));
-      items.add(const _NavItem('Students', '👥', 'Manage Students'));
+      items.add(const _NavItem('Live Cameras', '📹', 'Monitoring'));
+      items.add(const _NavItem('Students', '👥', 'Management'));
     }
     if (auth.isParent) {
-      items.add(const _NavItem('My Children', '👨‍👧', 'Track Attendance'));
+      items.add(const _NavItem('My Children', '👨‍👧', 'Tracking'));
     }
-    items.add(const _NavItem('Announcements', '📢', 'School News'));
-    items.add(const _NavItem('Inbox', '📬', 'Notifications'));
+    if (auth.user?.role == 'student') {
+      items.add(const _NavItem('My Marks', '📝', 'Examination Results'));
+    }
+    items.add(const _NavItem('Announcements', '📢', 'News & Records'));
+    items.add(const _NavItem('Messages', '💬', 'Direct Chat'));
+    items.add(const _NavItem('Inbox', '📬', 'System Notifications'));
     items.add(const _NavItem('Alerts', '🔔', 'Live Events'));
     if (auth.isAdmin || auth.isTeacher) {
-      items.add(const _NavItem('Reports', '📄', 'Download Reports'));
+      items.add(const _NavItem('Reports', '📄', 'Intelligence Logs'));
     }
     if (auth.isAdmin) {
-      items.add(const _NavItem('Admin', '🛡️', 'Manage System'));
+      items.add(const _NavItem('Admin', '🛡️', 'System Setup'));
     }
     if (auth.isAdmin || auth.isTeacher) {
-      items.add(const _NavItem('Settings', '⚙️', 'Configuration'));
+      items.add(const _NavItem('Settings', '⚙️', 'App Preferences'));
     }
-    items.add(const _NavItem('Profile', '👤', 'My Account'));
+    items.add(const _NavItem('Profile', '👤', 'Account Settings'));
     return items;
   }
 }

@@ -2,11 +2,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '../../context/AuthContext';
-import { pb } from '@/lib/pocketbase';
-
-const API = typeof window !== 'undefined'
-  ? `${window.location.protocol}//${window.location.hostname}:8001`
-  : 'http://localhost:8001';
 
 export default function TeacherDashboard() {
   const { user } = useAuth();
@@ -20,7 +15,7 @@ export default function TeacherDashboard() {
     Promise.all([
       api.getAttendanceStats(),
       api.getTodayAttendance(),
-      fetch(`${API}/api/v1/admin/teacher/me`, { headers: { Authorization: `Bearer ${pb.authStore.token}` } }).then(r => r.ok ? r.json() : null),
+      api.get('/admin/teacher/me').catch(() => null),
       api.getCameras(),
     ]).then(([s, t, p, c]) => {
       setStats(s); setToday(Array.isArray(t) ? t : []);

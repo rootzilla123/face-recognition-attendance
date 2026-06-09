@@ -1,7 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.schemas import AttendanceRecordCreate, AttendanceRecordResponse, AttendanceStats
+from app.schemas import AttendanceRecordCreate, AttendanceRecordResponse, AttendanceStats, ManualAttendanceCreate
+from app.routes.admin import write_audit
 from app.services.attendance_logic import AttendanceService
 from app.services.notification_service import notify_parents_of_attendance, NotificationService
 from app.models import Student, Teacher, TeacherCamera, Camera, UserRole
@@ -10,6 +11,36 @@ from typing import List
 from datetime import date
 
 router = APIRouter()
+
+@router.post("/manual", response_model=AttendanceRecordResponse)
+def mark_manual_attendance(
+    data: ManualAttendanceCreate,
+    db: Session = Depends(get_db),
+    _=Depends(require_teacher_or_admin)
+):
+    """Manually mark a student present (teacher/admin only) — bypasses confidence requirement"""
+    student = db.query(Student).filter(Student.student_id == data.student_id).first()
+    if not student:
+        raise HTTPException(status_code=404, detail="Student not found")
+    service = AttendanceService(db)
+    record = service.mark_attendance(
+        student_id=data.student_id,
+        camera_location=data.location,
+        confidence=1.0,
+        timestamp=data.timestamp,
+    )
+    if not record:
+        raise HTTPException(status_code=400, detail="Attendance already recorded for this student recently")
+    student_obj = db.query(Student).filter(Student.id == record.student_id).first()
+    if student_obj:
+        try:
+            notify_parents_of_attendance(db, student_obj, record, NotificationService())
+        except Exception:
+            pass
+    write_audit(db, _, action="manual_attendance", target_type="student",
+                target_id=data.student_id, detail={"location": data.location})
+    return record
+
 
 @router.post("/", response_model=AttendanceRecordResponse)
 def mark_attendance(
@@ -21,7 +52,7 @@ def mark_attendance(
     service = AttendanceService(db)
     record = service.mark_attendance(
         student_id=attendance.student_id,
-        camera_location=attendance.camera_location.value,
+        camera_location=attendance.camera_location,
         confidence=attendance.confidence_score,
         timestamp=attendance.timestamp
     )
@@ -39,7 +70,7 @@ def mark_attendance(
 
     return record
 
-@router.get("/", response_model=List[dict])
+@router.get("/", response_model=dict)
 def get_attendance_by_date_range(
     start_date: date = Query(...),
     end_date: date = Query(...),
@@ -129,3 +160,32 @@ def get_my_attendance(
 
     records = query.order_by(AttendanceRecord.timestamp.desc()).limit(200).all()
     return records
+
+
+@router.get("/{attendance_id}/clip")
+async def get_attendance_clip(
+    attendance_id: str,
+    db: Session = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    """Stream the 10-second video clip for an attendance record."""
+    from app.models import AttendanceRecord
+    from fastapi.responses import FileResponse
+    from pathlib import Path
+    
+    record = db.query(AttendanceRecord).filter(AttendanceRecord.id == attendance_id).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Attendance record not found")
+    
+    if not record.clip_path:
+        raise HTTPException(status_code=404, detail="No video clip available for this record")
+    
+    clip_file = Path(record.clip_path)
+    if not clip_file.exists():
+        raise HTTPException(status_code=404, detail="Video clip file not found")
+    
+    return FileResponse(
+        path=str(clip_file),
+        media_type="video/mp4",
+        filename=f"attendance_{attendance_id}.mp4"
+    )

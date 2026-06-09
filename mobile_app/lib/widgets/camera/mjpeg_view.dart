@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import '../../core/services/pocketbase_service.dart';
 
 /// Renders a live MJPEG stream by reading multipart/x-mixed-replace HTTP response
 class MjpegView extends StatefulWidget {
@@ -38,6 +39,9 @@ class _MjpegViewState extends State<MjpegView> {
     _error = false;
     _client = http.Client();
     final request = http.Request('GET', Uri.parse(widget.streamUrl));
+    // Add auth header so the backend doesn't reject the stream
+    final token = PocketBaseService.token;
+    if (token != null) request.headers['Authorization'] = 'Bearer $token';
 
     _client!.send(request).then((response) {
       final List<int> buf = [];

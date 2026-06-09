@@ -5,7 +5,7 @@ metadata:
   labels:
     app: backend
 spec:
-  replicas: 2
+  replicas: 1  # Must be 1 — VideoStreamingService opens cameras per-process; multiple replicas = duplicate attendance
   selector:
     matchLabels:
       app: backend
@@ -22,6 +22,13 @@ spec:
       imagePullSecrets:
         - name: ghcr-secret
       terminationGracePeriodSeconds: 30
+      initContainers:
+        - name: run-migrations
+          image: ghcr.io/calvinceoyugah2-del/face-recognition-attendance/backend:latest
+          command: ["alembic", "upgrade", "head"]
+          envFrom:
+            - secretRef:
+                name: app-secrets
       containers:
         - name: backend
           image: ghcr.io/calvinceoyugah2-del/face-recognition-attendance/backend:latest

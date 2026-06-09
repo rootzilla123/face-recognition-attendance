@@ -8,7 +8,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-PB_URL = "http://localhost:8090"
+PB_URL = "http://localhost:8092"
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
@@ -16,12 +16,28 @@ async def _verify_pb_token(token: str) -> dict | None:
     """Verify token against PocketBase and return user record."""
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
+            # Try auth-refresh first (works for regular tokens)
             r = await client.post(
                 f"{PB_URL}/api/collections/users/auth-refresh",
                 headers={"Authorization": f"Bearer {token}"}
             )
             if r.status_code == 200:
                 return r.json().get("record")
+            # Fallback: impersonation tokens can't be refreshed — verify by fetching user list
+            # Decode the JWT payload to get the user id (no signature check needed, PB already issued it)
+            import base64, json as _json
+            parts = token.split(".")
+            if len(parts) == 3:
+                padded = parts[1] + "=" * (-len(parts[1]) % 4)
+                payload = _json.loads(base64.urlsafe_b64decode(padded))
+                user_id = payload.get("id") or payload.get("sub")
+                if user_id:
+                    rec = await client.get(
+                        f"{PB_URL}/api/collections/users/records/{user_id}",
+                        headers={"Authorization": f"Bearer {token}"}
+                    )
+                    if rec.status_code == 200:
+                        return rec.json()
     except Exception as e:
         logger.warning(f"PocketBase token verify failed: {e}")
     return None

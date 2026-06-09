@@ -113,6 +113,25 @@ services:
       - compreface-api
       - compreface-admin
 
+  # ── Ollama (AI Chatbot) ──────────────────────────────────────────────────────
+  # Runs llama3.2 locally — no external API costs.
+  # GPU passthrough optional: add 'deploy.resources.reservations.devices' for NVIDIA.
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      OLLAMA_HOST: "0.0.0.0"
+    # Pull the model on first start
+    entrypoint: ["/bin/sh", "-c", "ollama serve & sleep 5 && ollama pull llama3.2:latest && wait"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:11434/api/tags || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 120s
+
   # ── FastAPI backend ─────────────────────────────────────────────────────────
   backend:
     image: ghcr.io/calvinceoyugah2-del/face-recognition-attendance/backend:${IMAGE_TAG:-latest}
@@ -122,6 +141,10 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/attendance_db
       REDIS_URL: redis://redis:6379
       COMPREFORE_URL: http://compreface-api:8080
+      OLLAMA_URL: http://ollama:11434
+      GOOGLE_APPLICATION_CREDENTIALS: /app/firebase-service-account.json
+    volumes:
+      - ./firebase-service-account.json:/app/firebase-service-account.json:ro
     ports:
       - "8001:8001"
     depends_on:
@@ -130,10 +153,11 @@ services:
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8001/api/v1/health || exit 1"]
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8001/api/v1/health')\""]
       interval: 15s
-      timeout: 5s
-      retries: 5
+      timeout: 10s
+      retries: 10
+      start_period: 60s
 
   # ── Next.js dashboard ───────────────────────────────────────────────────────
   dashboard:
@@ -194,7 +218,7 @@ services:
   cloudflared:
     image: cloudflare/cloudflared:latest
     restart: unless-stopped
-    command: tunnel --no-autoupdate run
+    command: tunnel --no-autoupdate --protocol http2 run
     environment:
       TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
     depends_on:
@@ -208,3 +232,4 @@ volumes:
   pocketbase_data:
   compreface_data:
   glitchtip_pg_data:
+  ollama_data:

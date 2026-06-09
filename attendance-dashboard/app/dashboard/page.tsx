@@ -32,6 +32,8 @@ function DashboardSkeleton() {
   );
 }
 
+import DownloadAppModal from '../components/DownloadAppModal';
+
 export default function DashboardPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
@@ -48,9 +50,18 @@ export default function DashboardPage() {
   if (!mounted || loading || !user) return <DashboardSkeleton />;
   if (!user.role) return <DashboardSkeleton />;
 
-  if (user.role === 'admin') return <AdminDashboard />;
-  if (user.role === 'teacher') return <TeacherDashboard />;
-  if (user.role === 'student') return <StudentDashboard />;
-  if (user.role === 'parent') return <ParentDashboard />;
-  return <DashboardSkeleton />;
+  const renderDashboard = () => {
+    if (user.role === 'admin') return <AdminDashboard />;
+    if (user.role === 'teacher') return <TeacherDashboard />;
+    if (user.role === 'student') return <StudentDashboard />;
+    if (user.role === 'parent') return <ParentDashboard />;
+    return <DashboardSkeleton />;
+  };
+
+  return (
+    <>
+      <DownloadAppModal />
+      {renderDashboard()}
+    </>
+  );
 }

@@ -54,7 +54,8 @@ async def stream_camera(
     camera_id: int,
     request: Request,
     db: Session = Depends(get_db),
-    mjpeg_service: MJPEGStreamService = Depends(get_mjpeg_service)
+    mjpeg_service: MJPEGStreamService = Depends(get_mjpeg_service),
+    _=Depends(__import__("app.dependencies", fromlist=["require_teacher_or_admin"]).require_teacher_or_admin)
 ):
     """
     Stream MJPEG video from a camera.

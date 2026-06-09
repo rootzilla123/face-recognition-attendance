@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from app.database import get_db
-from app.models import User, Teacher, TeacherCamera, Camera, Student, StudentFee
+from app.database import get_db, get_connection_stats
+from app.models import User, Teacher, TeacherCamera, Camera, Student, StudentFee, GradingScheme, TeacherSubject
 from app.dependencies import require_admin, get_current_user
 from typing import List, Optional
 from pydantic import BaseModel
@@ -83,71 +83,47 @@ def get_teacher_profile(
     teacher = db.query(Teacher).filter(Teacher.id == current_user.profile_id).first()
     if not teacher:
         raise HTTPException(status_code=404, detail="Teacher profile not found")
-    assigned = [tc.camera_id for tc in db.query(TeacherCamera).filter(TeacherCamera.teacher_id == teacher.id).all()]
+    assigned_ids = [tc.camera_id for tc in db.query(TeacherCamera).filter(TeacherCamera.teacher_id == teacher.id).all()]
+    cameras = db.query(Camera).filter(Camera.id.in_(assigned_ids)).all() if assigned_ids else []
     return {
         "id": str(teacher.id), "employee_id": teacher.employee_id,
         "full_name": teacher.full_name, "email": teacher.email,
         "department": teacher.department, "class_name": teacher.class_name,
-        "phone": teacher.phone, "assigned_camera_ids": assigned,
+        "phone": teacher.phone,
+        "assigned_camera_ids": assigned_ids,
+        "cameras": [{"id": c.id, "name": c.name, "location": c.location, "status": c.status} for c in cameras],
     }
 
 
 # --- Face enrollment status ---
-@router.get("/students/enrollment-status")
-def get_enrollment_status(
-    db: Session = Depends(get_db),
-    _=Depends(require_admin)
-):
-    """Admin: see which students have face photos enrolled in CompreFace"""
-    from app.models import Student, FaceEmbedding
-    students = db.query(Student).filter(Student.is_active == True).all()
-    result = []
-    for s in students:
-        embedding = db.query(FaceEmbedding).filter(FaceEmbedding.student_id == s.id).first()
-        result.append({
-            "student_id": s.student_id,
-            "full_name": s.full_name,
-            "grade_level": s.grade_level,
-            "section": s.section,
-            "enrolled": embedding is not None,
-            "enrolled_at": embedding.created_at.isoformat() if embedding else None,
-        })
-    enrolled = sum(1 for r in result if r["enrolled"])
-    return {
-        "total": len(result),
-        "enrolled": enrolled,
-        "not_enrolled": len(result) - enrolled,
-        "students": result
-    }
-
-
 @router.get("/students/enrollment-status")
 async def get_enrollment_status(
     db: Session = Depends(get_db),
     _=Depends(require_admin)
 ):
     """Admin: see which students have face photos enrolled in CompreFace"""
-    import httpx
-    from app.config import settings
     from app.models import Student, FaceEmbedding
 
     students = db.query(Student).filter(Student.is_active == True).all()
-    enrolled_ids = {
-        str(e.student_id)
-        for e in db.query(FaceEmbedding).all()
-    }
+    enrolled_ids = {str(e.student_id) for e in db.query(FaceEmbedding).all()}
+    enrolled = sum(1 for s in students if str(s.id) in enrolled_ids)
 
-    return [
-        {
-            "id": str(s.id),
-            "student_id": s.student_id,
-            "full_name": s.full_name,
-            "grade_level": s.grade_level,
-            "section": s.section,
-            "face_enrolled": str(s.id) in enrolled_ids,
-        }
-        for s in students
-    ]
+    return {
+        "total": len(students),
+        "enrolled": enrolled,
+        "not_enrolled": len(students) - enrolled,
+        "students": [
+            {
+                "id": str(s.id),
+                "student_id": s.student_id,
+                "full_name": s.full_name,
+                "grade_level": s.grade_level,
+                "section": s.section,
+                "face_enrolled": str(s.id) in enrolled_ids,
+            }
+            for s in students
+        ]
+    }
 
 
 # --- Student Fees ---
@@ -223,3 +199,137 @@ def delete_fee(fee_id: str, db: Session = Depends(get_db), _=Depends(require_adm
     db.delete(fee)
     db.commit()
     return {"message": "Fee deleted"}
+
+
+# ── System settings (recognition threshold, etc.) ─────────────────────────────
+from app.config import settings as _settings
+from pydantic import BaseModel as _BaseModel
+
+class SystemSettingsUpdate(_BaseModel):
+    recognition_threshold: float = None
+    duplicate_window_minutes: int = None
+
+@router.get("/system-settings")
+def get_system_settings(_=Depends(require_admin)):
+    return {
+        "recognition_threshold": _settings.recognition_threshold,
+        "duplicate_window_minutes": _settings.duplicate_window_minutes,
+    }
+
+@router.put("/system-settings")
+def update_system_settings(data: SystemSettingsUpdate, _=Depends(require_admin)):
+    """Update runtime recognition settings without restart."""
+    if data.recognition_threshold is not None:
+        if not 0.5 <= data.recognition_threshold <= 1.0:
+            raise HTTPException(status_code=400, detail="Threshold must be between 0.5 and 1.0")
+        _settings.recognition_threshold = data.recognition_threshold
+    if data.duplicate_window_minutes is not None:
+        _settings.duplicate_window_minutes = data.duplicate_window_minutes
+    return {
+        "recognition_threshold": _settings.recognition_threshold,
+        "duplicate_window_minutes": _settings.duplicate_window_minutes,
+    }
+
+@router.get("/db-connections")
+def get_db_connections(_=Depends(require_admin)):
+    """Get current database connection statistics for monitoring."""
+    return get_connection_stats()
+
+
+# ── Audit logs ────────────────────────────────────────────────────────────────
+from app.models import AuditLog
+from fastapi import Request
+
+def write_audit(db, actor, action: str, target_type: str = None, target_id: str = None, detail: dict = None, ip: str = None):
+    """Helper to write an audit log entry."""
+    try:
+        log = AuditLog(
+            actor_id=actor.id if actor else None,
+            actor_email=actor.email if actor else None,
+            action=action,
+            target_type=target_type,
+            target_id=str(target_id) if target_id else None,
+            detail=detail or {},
+            ip_address=ip,
+        )
+        db.add(log)
+        db.commit()
+    except Exception:
+        pass  # Never let audit logging break the main flow
+
+@router.get("/audit-logs")
+def get_audit_logs(
+    limit: int = 100,
+    action: str = None,
+    db: Session = Depends(get_db),
+    _=Depends(require_admin)
+):
+    # Temporary: return empty until audit_logs table is created
+    try:
+        q = db.query(AuditLog).order_by(AuditLog.created_at.desc())
+        if action:
+            q = q.filter(AuditLog.action == action)
+        logs = q.limit(limit).all()
+    except:
+        return []
+    return [
+        {
+            "id": str(l.id),
+            "actor": l.actor_email,
+            "action": l.action,
+            "target_type": l.target_type,
+            "target_id": l.target_id,
+            "detail": l.detail,
+            "ip": l.ip_address,
+            "timestamp": l.created_at.isoformat() if l.created_at else None,
+        }
+        for l in logs
+    ]
+
+# ── Grading Scheme & Teacher Subjects ────────────────────────────────────────
+
+class GradingSchemeRequest(BaseModel):
+    name: str
+    min_score_percent: float
+    grade: str
+    is_active: bool = True
+
+@router.get("/grading-schemes")
+def list_grading_schemes(db: Session = Depends(get_db), _=Depends(require_admin)):
+    return db.query(GradingScheme).all()
+
+@router.post("/grading-schemes")
+def create_grading_scheme(data: GradingSchemeRequest, db: Session = Depends(get_db), _=Depends(require_admin)):
+    scheme = GradingScheme(**data.dict())
+    db.add(scheme)
+    db.commit()
+    db.refresh(scheme)
+    return scheme
+
+@router.delete("/grading-schemes/{scheme_id}")
+def delete_grading_scheme(scheme_id: str, db: Session = Depends(get_db), _=Depends(require_admin)):
+    db.query(GradingScheme).filter(GradingScheme.id == scheme_id).delete()
+    db.commit()
+    return {"message": "Scheme deleted"}
+
+class TeacherSubjectRequest(BaseModel):
+    subject: str
+    class_name: str
+
+@router.get("/teachers/{teacher_id}/subjects")
+def list_teacher_subjects(teacher_id: str, db: Session = Depends(get_db), _=Depends(require_admin)):
+    return db.query(TeacherSubject).filter(TeacherSubject.teacher_id == teacher_id).all()
+
+@router.post("/teachers/{teacher_id}/subjects")
+def assign_teacher_subject(teacher_id: str, data: TeacherSubjectRequest, db: Session = Depends(get_db), _=Depends(require_admin)):
+    assignment = TeacherSubject(teacher_id=teacher_id, **data.dict())
+    db.add(assignment)
+    db.commit()
+    db.refresh(assignment)
+    return assignment
+
+@router.delete("/teacher-subjects/{assignment_id}")
+def unassign_teacher_subject(assignment_id: str, db: Session = Depends(get_db), _=Depends(require_admin)):
+    db.query(TeacherSubject).filter(TeacherSubject.id == assignment_id).delete()
+    db.commit()
+    return {"message": "Subject unassigned"}

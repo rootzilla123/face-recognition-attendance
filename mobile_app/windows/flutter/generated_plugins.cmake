@@ -4,7 +4,9 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   file_selector_windows
-  sentry_flutter
+  firebase_auth
+  firebase_core
+  printing
   share_plus
   url_launcher_windows
 )

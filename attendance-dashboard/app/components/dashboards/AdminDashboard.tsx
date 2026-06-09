@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '@/lib/api';
 import { useAuth } from '../../context/AuthContext';
+import AnalyticsDashboard from '../AnalyticsDashboard';
 
 export default function AdminDashboard() {
   const { user } = useAuth();
@@ -17,13 +18,15 @@ export default function AdminDashboard() {
       api.getGradeSummary(),
     ]).then(([s, t, g]) => {
       setStats(s); setToday(t); setGrade(g);
-    }).catch(err => {
-      console.error('Dashboard fetch error:', err);
-      console.error('Error details:', err.message, err.cause);
-    }).finally(() => setLoading(false));
+    }).catch(console.error)
+      .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div className="flex items-center justify-center min-h-screen"><div className="w-10 h-10 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" /></div>;
+  if (loading) return (
+    <div className="flex items-center justify-center min-h-screen">
+      <div className="w-10 h-10 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
 
   return (
     <div className="p-8 space-y-8">
@@ -48,6 +51,9 @@ export default function AdminDashboard() {
         ))}
       </div>
 
+      {/* Analytics */}
+      <AnalyticsDashboard />
+
       {/* Grade breakdown */}
       {grade?.grades?.length > 0 && (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
@@ -68,7 +74,7 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* Recent attendance */}
+      {/* Recent check-ins */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
         <h2 className="text-lg font-bold text-gray-900 mb-4">Recent Check-ins Today</h2>
         {today.length === 0 ? (
@@ -78,10 +84,9 @@ export default function AdminDashboard() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-gray-400 border-b border-gray-100">
-                  <th className="pb-3 font-medium">Student</th>
-                  <th className="pb-3 font-medium">Location</th>
-                  <th className="pb-3 font-medium">Time</th>
-                  <th className="pb-3 font-medium">Confidence</th>
+                  {['Student', 'Location', 'Time', 'Confidence'].map(h => (
+                    <th key={h} className="pb-3 font-medium">{h}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">

@@ -33,7 +33,7 @@ tmux send-keys -t "$SESSION:0.0" \
 # Pane 1 — FastAPI (split right)
 tmux split-window -h -t "$SESSION:0.0"
 tmux send-keys -t "$SESSION:0.1" \
-  "echo '=== FastAPI Backend ===' && cd '$BACKEND' && $PYTHON -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8001" Enter
+  "echo '=== FastAPI Backend ===' && cd '$BACKEND' && GOOGLE_APPLICATION_CREDENTIALS='$ROOT/firebase-service-account.json' $PYTHON -m uvicorn app.main:app --reload --host 0.0.0.0 --port 8001" Enter
 
 # Pane 2 — Next.js (split bottom-left)
 tmux split-window -v -t "$SESSION:0.0"

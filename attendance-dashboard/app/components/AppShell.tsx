@@ -2,9 +2,10 @@
 import { usePathname } from 'next/navigation';
 import { useAuth } from '../context/AuthContext';
 import Sidebar from './Sidebar';
+import ChatbotWidget from './ChatbotWidget';
 import { useEffect, useState } from 'react';
 
-const PUBLIC_PATHS = ['/', '/login', '/register', '/complete-profile', '/forgot-password', '/setup', '/verify-email'];
+const PUBLIC_PATHS = ['/', '/login', '/register', '/complete-profile', '/forgot-password', '/reset-password', '/setup', '/verify-email'];
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -25,6 +26,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       <main className="flex-1 overflow-y-auto pt-14 lg:pt-0">
         {children}
       </main>
+      <ChatbotWidget />
     </div>
   );
 }

@@ -9,6 +9,7 @@ import '../../core/utils/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/websocket_provider.dart';
 import '../shell.dart';
+import 'role_picker_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -43,6 +44,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
     if (_role == 'student' && (_studentId.text.isEmpty || _grade.text.isEmpty)) {
       setState(() => _error = 'Student ID and Grade are required');
+      return;
+    }
+    if (_role == 'teacher' && (_grade.text.isEmpty || _section.text.isEmpty)) {
+      setState(() => _error = 'Department and Employee ID are required');
       return;
     }
     setState(() { _loading = true; _error = null; });
@@ -86,6 +91,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
             'password': _pass.text,
             'full_name': _name.text.trim(),
             if (_phone.text.isNotEmpty) 'phone': _phone.text.trim(),
+          });
+        } catch (_) {}
+      } else if (_role == 'teacher') {
+        try {
+          await ApiClient().post('/auth/register/teacher', {
+            'email': _email.text.trim(),
+            'password': _pass.text,
+            'full_name': _name.text.trim(),
+            'department': _grade.text.trim(),
+            'employee_id': _section.text.trim(),
+            if (_phone.text.isNotEmpty) 'phone': _phone.text.trim(),
+          });
+        } catch (_) {}
+      } else if (_role == 'admin') {
+        try {
+          await ApiClient().post('/auth/register/admin', {
+            'email': _email.text.trim(),
+            'password': _pass.text,
+            'full_name': _name.text.trim(),
           });
         } catch (_) {}
       }
@@ -167,8 +191,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
         ]),
         const SizedBox(height: 16),
         // Role selector
-        Container(          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white.withValues(alpha: 0.1))),
-          child: Row(children: ['student', 'parent'].map((r) => Expanded(
+        Container(
+          decoration: BoxDecoration(color: Colors.white.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white.withValues(alpha: 0.1))),
+          child: Row(children: ['student', 'parent', 'teacher', 'admin'].map((r) => Expanded(
             child: GestureDetector(
               onTap: () => setState(() => _role = r),
               child: Container(
@@ -223,6 +248,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
             if (_role == 'parent') ...[
               const SizedBox(height: 10),
               _field(_phone, 'Phone', TextInputType.phone),
+            ],
+            if (_role == 'teacher') ...[
+              const SizedBox(height: 10),
+              _field(_grade, 'Department *', TextInputType.text), // Reusing _grade for department
+              const SizedBox(height: 10),
+              _field(_section, 'Employee ID *', TextInputType.text), // Reusing _section for employee ID
+              const SizedBox(height: 10),
+              _field(_phone, 'Phone (optional)', TextInputType.phone),
             ],
             const SizedBox(height: 20),
             SizedBox(
@@ -279,7 +312,8 @@ class _GoogleSignUpButtonState extends State<_GoogleSignUpButton> {
 
   Future<void> _signIn() async {
     setState(() => _loading = true);
-    final ok = await context.read<AuthProvider>().loginWithGoogle();
+    final auth = context.read<AuthProvider>();
+    final ok = await auth.loginWithGoogle();
     if (!mounted) return;
     setState(() => _loading = false);
     if (ok) {
@@ -289,8 +323,12 @@ class _GoogleSignUpButtonState extends State<_GoogleSignUpButton> {
         MaterialPageRoute(builder: (_) => const AppShell()),
         (_) => false,
       );
+    } else if (auth.pendingGoogleName != null) {
+      Navigator.push(context, MaterialPageRoute(
+        builder: (_) => RolePickerScreen(googleName: auth.pendingGoogleName!),
+      ));
     } else {
-      final err = context.read<AuthProvider>().error ?? 'Google sign-in failed';
+      final err = auth.error ?? 'Google sign-in failed';
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err), backgroundColor: Colors.red));
     }
   }

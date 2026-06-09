@@ -3,6 +3,7 @@ version: '3.8'
 services:
   postgres:
     image: postgres:15
+    command: postgres -c max_connections=300
     environment:
       POSTGRES_DB: attendance_db
       POSTGRES_USER: user

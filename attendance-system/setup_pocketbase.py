@@ -6,7 +6,7 @@ import requests
 import argparse
 import json
 
-PB_URL = "http://localhost:8091"
+PB_URL = "http://localhost:8092"
 
 def get_admin_token(email, password):
     # PocketBase v0.23+ uses _superusers collection
@@ -100,7 +100,7 @@ def main():
     })
 
     print("\nAll collections created successfully!")
-    print("You can now use PocketBase for auth at http://localhost:8091/_/")
+    print("You can now use PocketBase for auth at http://localhost:8092/_/")
 
 if __name__ == "__main__":
     main()

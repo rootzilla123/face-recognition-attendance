@@ -27,6 +27,8 @@ class User(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     # Optional link to role-specific profile
     profile_id = Column(UUID(as_uuid=True), nullable=True)  # links to Student/Teacher/Parent/Administrator id
+    # Device tokens for push notifications (FCM/APNs)
+    device_tokens = Column(JSONB, default=[])
 
 class Student(Base):
     __tablename__ = "students"
@@ -53,6 +55,7 @@ class AttendanceRecord(Base):
     timestamp = Column(DateTime(timezone=True), server_default=func.now())
     confidence_score = Column(DECIMAL(5, 4), nullable=False)
     face_image_url = Column(String(500))
+    clip_path = Column(String(500))  # Path to 10-second video clip
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 class FaceEmbedding(Base):
@@ -73,7 +76,9 @@ class Administrator(Base):
     password_hash = Column(String(255), nullable=False)
     full_name = Column(String(255), nullable=False)
     email = Column(String(255), nullable=False)
+    phone = Column(String(20))
     role = Column(String(20), default="viewer")
+    notification_preferences = Column(JSONB, default={"sms": True, "email": True, "in_app": True, "language": "en"})
     is_active = Column(Boolean, default=True)
     last_login = Column(DateTime(timezone=True))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -88,6 +93,7 @@ class Teacher(Base):
     phone = Column(String(20))
     department = Column(String(100))
     class_name = Column(String(100))   # e.g. "Grade 10 - Section A"
+    notification_preferences = Column(JSONB, default={"sms": True, "email": True, "in_app": True, "language": "en"})
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -108,8 +114,9 @@ class Parent(Base):
     full_name = Column(String(255), nullable=False)
     email = Column(String(255), unique=True, nullable=False)
     phone = Column(String(20))
+    fcm_token = Column(String(500))  # Firebase Cloud Messaging token for push notifications
     # A parent can have multiple children - stored as array of student UUIDs
-    notification_preferences = Column(JSONB, default={"sms": True, "email": True, "in_app": True, "language": "en"})
+    notification_preferences = Column(JSONB, default={"sms": True, "email": True, "in_app": True, "push": True, "language": "en"})
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -188,3 +195,56 @@ class Camera(Base):
     error_message = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+class AuditLog(Base):
+    __tablename__ = "audit_logs"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    actor_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    actor_email = Column(String(255))
+    action = Column(String(100), nullable=False)   # e.g. "manual_attendance", "enroll_face", "delete_student"
+    target_type = Column(String(50))               # "student", "camera", "attendance"
+    target_id = Column(String(255))
+    detail = Column(JSONB, default={})
+    ip_address = Column(String(50))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class StudentMark(Base) :
+    __tablename__ = "student_marks"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    student_id = Column(UUID(as_uuid=True), ForeignKey("students.id"), nullable=False)
+    teacher_id = Column(UUID(as_uuid=True), ForeignKey("teachers.id"), nullable=False)
+    subject = Column(String(100), nullable=False)
+    term = Column(String(50), nullable=False)          # e.g. "Term 1 2026"
+    score = Column(DECIMAL(5, 2), nullable=False)
+    max_score = Column(DECIMAL(5, 2), nullable=False, default=100)
+    grade = Column(String(5))                          # e.g. "A", "B+"
+    remarks = Column(Text)
+    is_published = Column(Boolean, default=False)      # teacher pushes to students/parents
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+
+class GradingScheme(Base):
+    __tablename__ = "grading_schemes"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name = Column(String(100), nullable=False)         # e.g. "Default Scheme"
+    min_score_percent = Column(DECIMAL(5, 2), nullable=False)
+    grade = Column(String(5), nullable=False)          # e.g. "A+"
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class TeacherSubject(Base):
+    """Restricts teachers to specific subjects and classes"""
+    __tablename__ = "teacher_subjects"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    teacher_id = Column(UUID(as_uuid=True), ForeignKey("teachers.id"), nullable=False)
+    subject = Column(String(100), nullable=False)      # e.g. "Mathematics"
+    class_name = Column(String(100), nullable=False)   # e.g. "Grade 10 - A"
+    created_at = Column(DateTime(timezone=True), server_default=func.now())

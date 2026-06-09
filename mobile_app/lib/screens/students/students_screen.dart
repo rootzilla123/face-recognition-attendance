@@ -7,7 +7,10 @@ import '../../providers/student_provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/utils/helpers.dart';
 import '../../core/utils/app_theme.dart';
+import '../../core/utils/responsive.dart';
 import '../../core/api/endpoints.dart';
+import '../../core/utils/server_config.dart';
+import '../../core/services/pocketbase_service.dart';
 import '../../widgets/common/gradient_header.dart';
 import '../../widgets/common/error_state.dart';
 import 'student_detail_screen.dart';
@@ -108,7 +111,12 @@ class _StudentsScreenState extends State<StudentsScreen> {
                             ))
                           : SliverList(
                               delegate: SliverChildBuilderDelegate(
-                                (ctx, i) => _StudentTile(student: filtered[i], onDelete: () => _confirmDelete(filtered[i].studentId, filtered[i].fullName)),
+                                (ctx, i) => Center(
+                                  child: ConstrainedBox(
+                                    constraints: BoxConstraints(maxWidth: Responsive.isDesktop(context) ? 1200 : double.infinity),
+                                    child: _StudentTile(student: filtered[i], onDelete: () => _confirmDelete(filtered[i].studentId, filtered[i].fullName)),
+                                  ),
+                                ),
                                 childCount: filtered.length,
                               ),
                             ),
@@ -133,6 +141,37 @@ class _StudentTile extends StatelessWidget {
   final dynamic student;
   final VoidCallback onDelete;
   const _StudentTile({required this.student, required this.onDelete});
+
+  Future<void> _enrollFace(BuildContext context) async {
+    final picker = ImagePicker();
+    final source = await showModalBottomSheet<ImageSource>(
+      context: context,
+      builder: (_) => SafeArea(child: Column(mainAxisSize: MainAxisSize.min, children: [
+        ListTile(leading: const Icon(Icons.camera_alt), title: const Text('Take Photo'), onTap: () => Navigator.pop(context, ImageSource.camera)),
+        ListTile(leading: const Icon(Icons.photo_library), title: const Text('Choose from Gallery'), onTap: () => Navigator.pop(context, ImageSource.gallery)),
+      ])),
+    );
+    if (source == null || !context.mounted) return;
+    final picked = await picker.pickImage(source: source, imageQuality: 85);
+    if (picked == null || !context.mounted) return;
+
+    showDialog(context: context, barrierDismissible: false, builder: (_) => const AlertDialog(content: Row(children: [CircularProgressIndicator(), SizedBox(width: 16), Text('Enrolling face...')])));
+
+    try {
+      final apiBase = ServerConfig.baseUrl;
+      final token = PocketBaseService.token;
+      final req = http.MultipartRequest('POST', Uri.parse('$apiBase/api/v1/students/${student.studentId}/enroll-face'));
+      if (token != null) req.headers['Authorization'] = 'Bearer $token';
+      req.files.add(await http.MultipartFile.fromPath('photo', picked.path));
+      final res = await req.send();
+      if (context.mounted) Navigator.pop(context);
+      if (context.mounted) {
+        showSnack(context, res.statusCode == 200 ? '✅ Face enrolled successfully!' : 'Enrollment failed (${res.statusCode})', error: res.statusCode != 200);
+      }
+    } catch (e) {
+      if (context.mounted) { Navigator.pop(context); showSnack(context, 'Error: $e', error: true); }
+    }
+  }
 
   void _showEditDialog(BuildContext context) {
     final nameCtrl = TextEditingController(text: student.fullName);
@@ -200,6 +239,7 @@ class _StudentTile extends StatelessWidget {
           borderRadius: BorderRadius.circular(22),
           child: CachedNetworkImage(
             imageUrl: photoUrl,
+            httpHeaders: PocketBaseService.authHeaders,
             width: 44, height: 44,
             fit: BoxFit.cover,
             placeholder: (_, __) => Container(
@@ -233,6 +273,14 @@ class _StudentTile extends StatelessWidget {
           ],
         ),
         trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+          IconButton(
+            icon: const Icon(Icons.camera_alt_outlined, color: AppColors.secondary600, size: 20),
+            onPressed: () => _enrollFace(context),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(),
+            tooltip: 'Re-enroll face',
+          ),
+          const SizedBox(width: 4),
           IconButton(
             icon: const Icon(Icons.edit_outlined, color: AppColors.primary600, size: 20),
             onPressed: () => _showEditDialog(context),
