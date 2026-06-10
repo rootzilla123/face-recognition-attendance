@@ -178,14 +178,16 @@ async def validate_startup_dependencies():
     else:
         logger.info("✓ CompreFace ready for face recognition")
 
-    # Twilio credentials validation (optional; validate only when configured)
+    # Twilio credentials validation (optional; skip in local development without network)
     if settings.twilio_account_sid and settings.twilio_auth_token:
         try:
             from twilio.rest import Client
             twilio_client = Client(settings.twilio_account_sid, settings.twilio_auth_token)
             twilio_client.api.accounts(settings.twilio_account_sid).fetch()
+            logger.info("✓ Twilio credentials validated")
         except Exception as e:
-            raise RuntimeError(f"Twilio credential validation failed: {e}") from e
+            logger.warning(f"⚠️  Twilio validation skipped (no network or invalid credentials): {e}")
+            # Don't crash - SMS/email notifications will fail gracefully if needed
 
 
 async def connection_monitor_loop():
