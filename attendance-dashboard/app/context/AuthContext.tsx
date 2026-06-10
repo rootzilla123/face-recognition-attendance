@@ -6,13 +6,18 @@ interface AuthContextType {
   user: PBUser | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  demoLogin: (role: 'admin' | 'teacher' | 'student' | 'parent') => Promise<void>;
   logout: () => void;
   refreshUser: () => void;
+  isDemoUser: boolean;
 }
 
 const AuthContext = createContext<AuthContextType>({
-  user: null, loading: false,
-  login: async () => {}, logout: () => {}, refreshUser: () => {},
+  user: null, loading: false, isDemoUser: false,
+  login: async () => {}, 
+  demoLogin: async () => {},
+  logout: () => {}, 
+  refreshUser: () => {},
 });
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -23,9 +28,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     return null;
   });
+  const [isDemoUser, setIsDemoUser] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  // Hydration: mark loading as done once we've checked the auth store
   useEffect(() => {
     setLoading(false);
   }, []);
@@ -41,14 +46,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string) => {
-    const auth = await pb.collection('users').authWithPassword(email, password);
-    setUser(auth.record as unknown as PBUser);
+    try {
+      const auth = await pb.collection('users').authWithPassword(email, password);
+      setUser(auth.record as unknown as PBUser);
+      setIsDemoUser(false);
+      localStorage.setItem('demo_user', 'false');
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  const demoLogin = async (role: 'admin' | 'teacher' | 'student' | 'parent') => {
+    const mockUser: PBUser = {
+      id: `demo-${role}`,
+      email: `${role}@demo.local`,
+      name: role.charAt(0).toUpperCase() + role.slice(1),
+      role: role,
+      created: new Date().toISOString(),
+      updated: new Date().toISOString(),
+    };
+    
+    setUser(mockUser);
+    setIsDemoUser(true);
+    localStorage.setItem('demo_user', 'true');
+    localStorage.setItem('demo_role', role);
   };
 
   const logout = () => {
     pb.authStore.clear();
     localStorage.removeItem('api_token');
+    localStorage.removeItem('demo_user');
+    localStorage.removeItem('demo_role');
     setUser(null);
+    setIsDemoUser(false);
     window.location.href = '/login';
   };
 
@@ -59,7 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, loading, login, demoLogin, logout, refreshUser, isDemoUser }}>
       {children}
     </AuthContext.Provider>
   );

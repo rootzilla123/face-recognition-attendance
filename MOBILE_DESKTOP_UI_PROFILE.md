@@ -5,7 +5,7 @@
 **Core Principle**: Simple, fast, reliable. School staff and students should understand the app in seconds, not minutes.
 
 **Design Language**: Modern, clean, minimal. No unnecessary animations or decorations. Every pixel serves a purpose.
-
+cli
 **Color Palette**: 
 - Primary: Blue (#3B82F6) - Trust, reliability
 - Secondary: Green (#10B981) - Success, present
