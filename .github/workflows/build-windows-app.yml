@@ -47,8 +47,8 @@ jobs:
         if: always()
         run: |
           echo "=== Windows Build Status Check ==="
-          if (Test-Path mobile_app\build\windows\runner\Release\AttendanceAI.exe) {
-            Write-Host "✓ Build successful - EXE found" -ForegroundColor Green
+          if (Test-Path mobile_app\build\windows\x64\runner\Release\AttendanceAI.exe) {
+            Write-Host "✓ Build successful - EXE found at x64 path" -ForegroundColor Green
           } else {
             Write-Host "✗ Build failed - checking for errors..." -ForegroundColor Red
             if (Test-Path mobile_app\build) {
@@ -64,7 +64,7 @@ jobs:
         if: always()
         with:
           name: windows-app-exe
-          path: mobile_app/build/windows/runner/Release/
+          path: mobile_app/build/windows/x64/runner/Release/
           retention-days: 30
           if-no-files-found: 'warn'
 
