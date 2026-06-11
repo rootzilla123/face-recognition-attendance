@@ -50,7 +50,7 @@ jobs:
           dir mobile_app\build\ /s 2>&1 || echo "Build directory not found"
 
       - name: Upload Windows EXE artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: windows-app-exe
           path: mobile_app/build/windows/runner/Release/
@@ -95,7 +95,7 @@ jobs:
           find mobile_app/build -type f -name "*.apk" 2>&1 || echo "No APK files found"
 
       - name: Upload Android APK artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: android-app-apk
           path: mobile_app/build/app/outputs/flutter-apk/app-release.apk
@@ -109,13 +109,13 @@ jobs:
     
     steps:
       - name: Download Windows artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: windows-app-exe
           path: ./windows-app
 
       - name: Download Android artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: android-app-apk
           path: ./android-app
