@@ -61,6 +61,7 @@ jobs:
           TWILIO_PHONE_NUMBER: "+10000000000"
           RESEND_API_KEY: test
           RESEND_FROM_EMAIL: test@test.com
+          ALEMBIC_MODE: "true"
         run: alembic upgrade head
 
       - name: Run tests

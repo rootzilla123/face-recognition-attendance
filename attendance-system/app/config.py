@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings
 from urllib.parse import urlparse
+import os
 
 
 class Settings(BaseSettings):
@@ -135,4 +136,7 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-settings.validate_required_settings()
+
+# Skip validation during migrations
+if not os.environ.get("ALEMBIC_MODE"):
+    settings.validate_required_settings()
