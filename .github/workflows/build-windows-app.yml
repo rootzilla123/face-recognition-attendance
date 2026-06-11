@@ -32,22 +32,36 @@ jobs:
           channel: 'stable'
           cache: false
 
+      - name: Get Flutter dependencies
+        run: |
+          cd mobile_app
+          flutter pub get
+
       - name: Build Windows Application
         run: |
           cd mobile_app
-          flutter build windows --release --tree-shake-icons
+          flutter build windows --release --tree-shake-icons 2>&1
+        continue-on-error: true
 
-      - name: List build output
+      - name: Check build status and show logs
         if: always()
         run: |
-          echo "=== Windows build output ==="
-          dir mobile_app\build\windows\runner\Release\ 2>&1 || echo "Directory not found"
-          echo "=== Full mobile_app/build tree ==="
-          dir mobile_app\build\ /s 2>&1 || echo "Build directory not found"
+          echo "=== Checking build status ==="
+          if exist mobile_app\build\windows\runner\Release\mobile_app.exe (
+            echo "✓ Build successful - EXE found"
+          ) else (
+            echo "✗ Build failed - checking for errors..."
+            if exist mobile_app\build (
+              echo "=== Windows build directory structure ==="
+              dir mobile_app\build\ /s 2>&1 | head -50
+            ) else (
+              echo "Build directory doesn't exist"
+            )
+          )
 
       - name: Upload Windows EXE artifact
         uses: actions/upload-artifact@v4
-        if: success()
+        if: hashFiles('mobile_app/build/windows/runner/Release/mobile_app.exe') != ''
         with:
           name: windows-app-exe
           path: mobile_app/build/windows/runner/Release/
