@@ -14,6 +14,7 @@ class ServerSetupScreen extends StatefulWidget {
 
 class _ServerSetupScreenState extends State<ServerSetupScreen> {
   final _urlController = TextEditingController();
+  final _pbUrlController = TextEditingController();
   bool _isLoading = false;
   bool _testPassed = false;
   String _testMessage = '';
@@ -25,16 +26,26 @@ class _ServerSetupScreenState extends State<ServerSetupScreen> {
   }
 
   Future<void> _loadCurrentConfig() async {
-    final config = await ServerConfig.getApiUrl();
+    final apiUrl = await ServerConfig.getApiUrl();
+    final pbUrl = await ServerConfig.getPbUrl();
     if (mounted) {
-      _urlController.text = config;
+      _urlController.text = apiUrl;
+      _pbUrlController.text = pbUrl;
     }
   }
 
   Future<void> _testConnection() async {
     if (_urlController.text.isEmpty) {
       setState(() {
-        _testMessage = 'Please enter a server URL';
+        _testMessage = 'Please enter API server URL';
+        _testPassed = false;
+      });
+      return;
+    }
+
+    if (_pbUrlController.text.isEmpty) {
+      setState(() {
+        _testMessage = 'Please enter PocketBase URL';
         _testPassed = false;
       });
       return;
@@ -47,8 +58,9 @@ class _ServerSetupScreenState extends State<ServerSetupScreen> {
     });
 
     try {
-      // Temporarily set the URL for testing
+      // Temporarily set the URLs for testing
       await ServerConfig.setApiUrl(_urlController.text);
+      await ServerConfig.setPbUrl(_pbUrlController.text);
       final isHealthy = await HealthService.check();
 
       if (mounted) {
@@ -74,6 +86,7 @@ class _ServerSetupScreenState extends State<ServerSetupScreen> {
   Future<void> _saveAndContinue() async {
     if (_testPassed) {
       await ServerConfig.setApiUrl(_urlController.text);
+      await ServerConfig.setPbUrl(_pbUrlController.text);
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('server_setup_done', true);
       if (!mounted) return;
@@ -148,7 +161,7 @@ class _ServerSetupScreenState extends State<ServerSetupScreen> {
 
                 // Custom URL Input
                 const Text(
-                  'Custom Server URL',
+                  'API Server URL',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 14,
@@ -175,13 +188,44 @@ class _ServerSetupScreenState extends State<ServerSetupScreen> {
                       borderRadius: BorderRadius.circular(12),
                       borderSide: BorderSide(color: AppColors.primary500),
                     ),
-                    suffixIcon: _testPassed
-                        ? const Icon(Icons.check_circle, color: Color(0xFF4ADE80))
-                        : null,
                   ),
                   style: const TextStyle(color: Colors.white),
                 ),
-                const SizedBox(height: 16),
+                const SizedBox(height: 24),
+
+                // PocketBase URL Input
+                const Text(
+                  'PocketBase URL',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _pbUrlController,
+                  enabled: !_isLoading,
+                  decoration: InputDecoration(
+                    hintText: 'http://192.168.1.1:8092',
+                    hintStyle: TextStyle(color: Colors.white30),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.white12),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: Colors.white12),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: BorderSide(color: AppColors.primary500),
+                    ),
+                  ),
+                  style: const TextStyle(color: Colors.white),
+                ),
+                const SizedBox(height: 24),
 
                 // Test Connection Button
                 SizedBox(
@@ -232,17 +276,29 @@ class _ServerSetupScreenState extends State<ServerSetupScreen> {
                             : Colors.red.withOpacity(0.3),
                       ),
                     ),
-                    child: Text(
-                      _testMessage,
-                      style: TextStyle(
-                        color: _testPassed
-                            ? const Color(0xFF4ADE80)
-                            : Colors.red[300],
-                        fontSize: 12,
-                      ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _testPassed ? Icons.check_circle : Icons.error_outline,
+                          color: _testPassed ? Colors.green[400] : Colors.red[300],
+                          size: 20,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            _testMessage,
+                            style: TextStyle(
+                              color: _testPassed
+                                  ? const Color(0xFF4ADE80)
+                                  : Colors.red[300],
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ).animate().fadeIn().scaleY(begin: 0.8),
-                const SizedBox(height: 32),
+                const SizedBox(height: 24),
 
                 // Continue Button
                 SizedBox(

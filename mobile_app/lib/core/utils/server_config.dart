@@ -39,6 +39,16 @@ class ServerConfig {
     await prefs.setString(_pbKey, url);
   }
 
+  static Future<void> setPbUrl(String url) async {
+    _pbCurrent = url;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_pbKey, url);
+  }
+
+  static Future<String> getPbUrl() async {
+    return _pbCurrent ?? '';
+  }
+
   /// Predefined server options for easy switching
   static const Map<String, Map<String, String>> presetServers = {
     'localhost': {
