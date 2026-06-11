@@ -31,6 +31,8 @@ jobs:
           flutter-version: '3.44.1'
           channel: 'stable'
           cache: false
+
+      - name: Build Windows Application
         run: |
           cd mobile_app
           flutter build windows --release --tree-shake-icons
@@ -45,6 +47,7 @@ jobs:
 
       - name: Upload Windows EXE artifact
         uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: windows-app-exe
           path: mobile_app/build/windows/runner/Release/
@@ -90,6 +93,7 @@ jobs:
 
       - name: Upload Android APK artifact
         uses: actions/upload-artifact@v4
+        if: success()
         with:
           name: android-app-apk
           path: mobile_app/build/app/outputs/flutter-apk/app-release.apk
