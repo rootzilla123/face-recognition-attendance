@@ -4,6 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../shell.dart';
 import '../auth/login_screen.dart';
 import '../onboarding/onboarding_screen.dart';
+import '../onboarding/server_setup_screen.dart';
 import '../../core/services/health_service.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/utils/app_theme.dart';
@@ -38,11 +39,23 @@ class _SplashScreenState extends State<SplashScreen> {
       Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const AppShell()));
     } else {
       final prefs = await SharedPreferences.getInstance();
+      final serverSetupDone = prefs.getBool('server_setup_done') ?? false;
       final onboardingDone = prefs.getBool('onboarding_done') ?? false;
       if (!mounted) return;
-      Navigator.pushReplacement(context, MaterialPageRoute(
-        builder: (_) => onboardingDone ? const LoginScreen() : const OnboardingScreen(),
-      ));
+      
+      if (!serverSetupDone) {
+        Navigator.pushReplacement(context, MaterialPageRoute(
+          builder: (_) => const ServerSetupScreen(),
+        ));
+      } else if (!onboardingDone) {
+        Navigator.pushReplacement(context, MaterialPageRoute(
+          builder: (_) => const OnboardingScreen(),
+        ));
+      } else {
+        Navigator.pushReplacement(context, MaterialPageRoute(
+          builder: (_) => const LoginScreen(),
+        ));
+      }
     }
   }
 
