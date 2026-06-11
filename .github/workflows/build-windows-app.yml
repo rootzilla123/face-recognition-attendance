@@ -46,26 +46,27 @@ jobs:
       - name: Check build status and show logs
         if: always()
         run: |
-          echo "=== Checking build status ==="
+          echo "=== Windows Build Status Check ==="
           if (Test-Path mobile_app\build\windows\runner\Release\AttendanceAI.exe) {
-            echo "✓ Build successful - EXE found"
+            Write-Host "✓ Build successful - EXE found" -ForegroundColor Green
           } else {
-            echo "✗ Build failed - checking for errors..."
+            Write-Host "✗ Build failed - checking for errors..." -ForegroundColor Red
             if (Test-Path mobile_app\build) {
-              echo "=== Windows build directory structure ==="
+              Write-Host "=== Windows build directory structure ===" -ForegroundColor Yellow
               Get-ChildItem mobile_app\build\ -Recurse | Select-Object -First 50
             } else {
-              echo "Build directory doesn't exist"
+              Write-Host "Build directory doesn't exist" -ForegroundColor Red
             }
           }
 
       - name: Upload Windows EXE artifact
         uses: actions/upload-artifact@v4
-        if: hashFiles('mobile_app/build/windows/runner/Release/AttendanceAI.exe') != ''
+        if: always()
         with:
           name: windows-app-exe
           path: mobile_app/build/windows/runner/Release/
           retention-days: 30
+          if-no-files-found: 'warn'
 
   build-android:
     name: Build Android APK
