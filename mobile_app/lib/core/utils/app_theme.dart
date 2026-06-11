@@ -122,7 +122,7 @@ class AppTheme {
         onSurface: AppColors.gray900,
       ),
       scaffoldBackgroundColor: AppColors.gray50,
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         elevation: 8,
         shadowColor: AppColors.gray300.withValues(alpha: 0.3),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
@@ -212,7 +212,7 @@ class AppTheme {
         onSurface: Colors.white,
       ),
       scaffoldBackgroundColor: const Color(0xFF0F172A), // gray-900 equivalent
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         elevation: 8,
         shadowColor: Colors.black.withValues(alpha: 0.4),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
