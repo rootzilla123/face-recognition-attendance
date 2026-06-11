@@ -103,8 +103,8 @@ class TeacherCamera(Base):
     __tablename__ = "teacher_cameras"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    teacher_id = Column(UUID(as_uuid=True), ForeignKey("teachers.id"), nullable=False)
-    camera_id = Column(Integer, ForeignKey("cameras.id"), nullable=False)
+    teacher_id = Column(UUID(as_uuid=True), ForeignKey("teachers.id", ondelete="CASCADE"), nullable=False)
+    camera_id = Column(Integer, ForeignKey("cameras.id", ondelete="CASCADE"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
 class Parent(Base):
