@@ -47,21 +47,21 @@ jobs:
         if: always()
         run: |
           echo "=== Checking build status ==="
-          if exist mobile_app\build\windows\runner\Release\mobile_app.exe (
+          if (Test-Path mobile_app\build\windows\runner\Release\AttendanceAI.exe) {
             echo "✓ Build successful - EXE found"
-          ) else (
+          } else {
             echo "✗ Build failed - checking for errors..."
-            if exist mobile_app\build (
+            if (Test-Path mobile_app\build) {
               echo "=== Windows build directory structure ==="
-              dir mobile_app\build\ /s 2>&1 | head -50
-            ) else (
+              Get-ChildItem mobile_app\build\ -Recurse | Select-Object -First 50
+            } else {
               echo "Build directory doesn't exist"
-            )
-          )
+            }
+          }
 
       - name: Upload Windows EXE artifact
         uses: actions/upload-artifact@v4
-        if: hashFiles('mobile_app/build/windows/runner/Release/mobile_app.exe') != ''
+        if: hashFiles('mobile_app/build/windows/runner/Release/AttendanceAI.exe') != ''
         with:
           name: windows-app-exe
           path: mobile_app/build/windows/runner/Release/
