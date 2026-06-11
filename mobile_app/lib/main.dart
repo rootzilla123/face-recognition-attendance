@@ -11,8 +11,9 @@ import 'core/services/connectivity_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialize Firebase only on supported platforms (Android, iOS, Web)
-  if (kIsWeb || Platform.isAndroid || Platform.isIOS) {
+  // Initialize Firebase only on mobile platforms and web
+  // Skip on Windows/Linux/macOS desktop
+  if (kIsWeb || (Platform.isAndroid || Platform.isIOS)) {
     try {
       await Firebase.initializeApp();
     } catch (e) {
