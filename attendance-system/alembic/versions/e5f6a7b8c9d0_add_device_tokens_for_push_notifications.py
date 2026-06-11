@@ -1,7 +1,7 @@
 """add_device_tokens_for_push_notifications
 
 Revision ID: e5f6a7b8c9d0
-Revises: b2c3d4e5f6a7
+Revises: d4e5f6a7b8c9
 Create Date: 2026-04-30 10:00:00.000000
 
 """
@@ -11,7 +11,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = 'e5f6a7b8c9d0'
-down_revision = 'b2c3d4e5f6a7'
+down_revision = 'd4e5f6a7b8c9'
 branch_labels = None
 depends_on = None
 
